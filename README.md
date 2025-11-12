@@ -37,7 +37,7 @@ English | Латиница A–Z (неполная система Брайля) 
 ### Требования
 - Python ≥ 3.10  
 - [`kivy`](https://kivy.org/doc/stable/gettingstarted/installation.html)  
-- Шрифт [`DejaVuSans.ttf`]*(включён в репозиторий)*
+- Шрифт [`DejaVuSans.ttf`]  *(включён в репозиторий)*
 
 ### Установка и запуск
 ```bash
