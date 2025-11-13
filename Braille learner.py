@@ -1,4 +1,3 @@
-from attr.validators import disabled
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.lang import Builder
@@ -1723,4 +1722,5 @@ class BrailleApp(App):
 
 
 if __name__ == '__main__':
+
     BrailleApp().run()
