@@ -603,7 +603,7 @@ Builder.load_string('''
             text: root.back_btn
             size_hint_y: None
             height: dp(50)
-            on_press: root.open_braille_input()
+            on_press: root.close_braille_input()
             on_press: root.manager.current = 'menu'
 
 <PracticeLevelsScreen>:
@@ -1663,6 +1663,10 @@ class TranslatorScreen(BaseScreen):
         else:
             self.ids.braille_input_panel.opacity = 0
             self.ids.braille_input_panel.disabled = True
+
+    def close_braille_input(self):
+        self.ids.braille_input_panel.opacity = 0
+        self.ids.braille_input_panel.disabled = True
 
     def confirm_braille_input(self):
         lang = self.app.current_language
