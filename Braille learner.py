@@ -1,24 +1,24 @@
-from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.lang import Builder
 from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListProperty, NumericProperty
-from kivy.uix.spinner import Spinner
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.boxlayout import BoxLayout
 from kivy.core.text import LabelBase
-from kivy.metrics import dp
+from kivy.uix.spinner import Spinner
+from kivy.core.window import Window
+from kivy.uix.button import Button
+from kivy.uix.widget import Widget
+from kivy.uix.popup import Popup
+from kivy.uix.label import Label
 from kivy.utils import platform
 from kivy.config import Config
-from kivy.uix.widget import Widget
-from kivy.uix.scrollview import ScrollView
-from kivy.core.window import Window
+from kivy.lang import Builder
 from kivy.clock import Clock
-from kivy.uix.popup import Popup
+from kivy.metrics import dp
+from kivy.app import App
 from collections import OrderedDict
-import json
 import random
+import json
 import math
 import time
 import os
@@ -163,13 +163,14 @@ Builder.load_string('''
             cols: 1
             spacing: dp(5)
             size_hint_y: 0.6
-            padding: dp(5)
+            padding: [dp(20), 0, dp(20), 0]
             row_default_height: dp(80)
         BaseButton:
             text: root.back_btn
             height: dp(50)
             on_press:
                 root.quick_review_mode = False
+                app.stop_quick_review()
                 root.manager.current = 'practice_levels'
 
 <MediumPracticeScreen>:
@@ -309,6 +310,7 @@ Builder.load_string('''
                 pos_hint: {'center_x': 0.5}
                 on_press:
                     root.quick_review_mode = False
+                    app.stop_quick_review()
                     root.manager.current = 'practice_levels'
 
 <SettingsScreen>:
@@ -592,15 +594,16 @@ Builder.load_string('''
                         on_press: root.confirm_braille_input()
 
                     BaseButton:
-                        text: root.clear_btn
+                        text: root.delete_btn
                         size_hint: 0.5, 1
                         height: dp(60)
-                        on_press: root.clear_braille_input()
+                        on_press: root.delete_last_char()
 
         BaseButton:
             text: root.back_btn
             size_hint_y: None
             height: dp(50)
+            on_press: root.open_braille_input()
             on_press: root.manager.current = 'menu'
 
 <PracticeLevelsScreen>:
@@ -644,7 +647,6 @@ Builder.load_string('''
             on_press: root.manager.current = 'menu'
 ''')
 
-# Данные Брайля
 braille_data = {
     'en': OrderedDict(sorted({
         'A': [1, 0, 0, 0, 0, 0], 'B': [1, 1, 0, 0, 0, 0], 'C': [1, 0, 0, 1, 0, 0],
@@ -685,6 +687,7 @@ braille_data = {
         ('Ѳ', [1, 1, 0, 1, 1, 1]), ('Ѵ', [1, 0, 0, 0, 1, 0])
     ])
 }
+
 
 translations = {
     'en': {
@@ -728,6 +731,7 @@ translations = {
         "confirm_btn": "Confirm",
         "clear_btn": "Clear",
         'input_braille_btn': 'Input Braille',
+        'delete_btn': 'Delete'
     },
     'ru': {
         'menu_title': 'Главное меню',
@@ -770,6 +774,7 @@ translations = {
         "confirm_btn": "Подтвердить",
         "clear_btn": "Очистить",
         'input_braille_btn': 'Ввод Брайля',
+        'delete_btn': 'Удалить'
     },
     'dru': {
         'menu_title': 'Главное меню',
@@ -811,7 +816,8 @@ translations = {
         'stats_label': 'Правильно: {} \n Ошибокъ: {}',
         "confirm_btn": "Подтвердить",
         "clear_btn": "Очистить",
-        'input_braille_btn': 'Вводъ ​Брайля​',
+        'input_braille_btn': 'Вводъ Брайля',
+        'delete_btn': 'Удалить'
     }
 }
 
@@ -866,7 +872,7 @@ class BaseScreen(Screen):
         all_correct = sum(s.get('correct', 0) for s in total_stats.values())
         total_attempts_global = all_correct + all_wrong
         global_error_rate = (all_wrong + alpha) / (total_attempts_global + 2 * alpha) if total_attempts_global > 0 else 0.5
-        base_weight = 1.5 + global_error_rate  # 1.5..2.5 обычно
+        base_weight = 1.5 + global_error_rate
 
         total_shows = stat.get('correct', 0) + stat.get('wrong', 0)
         frequency_factor = 1.0 / (1.0 + math.log1p(total_shows))
@@ -989,9 +995,15 @@ class PracticeScreen(BaseScreen):
         self.current_streak = 0
         self.correct_button = None
         self.clock_event = None
+        self.scheduled_events = []
         super().__init__(**kwargs)
         self.bind(on_pre_enter=self.on_pre_enter)
         self.bind(on_leave=self.on_leave)
+
+    def schedule_once(self, callback, delay):
+        event = Clock.schedule_once(callback, delay)
+        self.scheduled_events.append(event)
+        return event
 
     def update_streak_text(self):
         lang = self.app.current_language
@@ -1020,16 +1032,19 @@ class PracticeScreen(BaseScreen):
             self.clock_event.cancel()
             self.clock_event = None
 
+        for child in self.ids.answers_grid.children:
+            child.disabled = True
+        if self.correct_button:
+            self.correct_button.background_color = (0, 1, 0, 1)
+
         if self.quick_review_mode:
             self.app.quick_streak -= 1
             self.update_streak_text()
-            Clock.schedule_once(lambda dt: self.app.next_quick_step(), 0.5)
+            self.schedule_once(lambda dt: self.app.next_quick_step(), 1.2)
         else:
-            self.current_streak -= 1
+            self.current_streak = 0
             self.update_streak_text()
-            if self.correct_button:
-                self.correct_button.background_color = (0, 1, 0, 1)
-            Clock.schedule_once(lambda dt: self.reset_interface(reset_streak=False), 1)
+            self.schedule_once(lambda dt: self.reset_interface(reset_streak=False), 1.2)
 
     def _update_grid(self, instance, value):
         grid = self.ids.answers_grid
@@ -1042,43 +1057,52 @@ class PracticeScreen(BaseScreen):
             if letter not in answers:
                 answers.append(letter)
         random.shuffle(answers)
-
-        available_width = grid.width - dp(5) * (int(self.app.current_difficulty) - 1)
+        horizontal_padding = dp(20)
+        available_width = grid.width - (2 * horizontal_padding)
         min_btn_width = dp(100)
         max_btn_width = dp(300)
-        cols = max(1, min(int(available_width // min_btn_width), int(self.app.current_difficulty)))
-        btn_width = (available_width - dp(5) * (cols - 1)) / cols
+        num_options = int(self.app.current_difficulty)
+        cols = max(1, min(int(available_width // (min_btn_width + dp(5))), num_options))
+        total_spacing = dp(5) * (cols - 1)
+        btn_width = (available_width - total_spacing) / cols
         btn_width = max(min_btn_width, min(btn_width, max_btn_width))
-        grid.cols = cols
 
+        grid.cols = cols
+        grid.padding = [horizontal_padding, 0, horizontal_padding, 0]
 
         for answer in answers:
-            btn_properties = {
-                'font_size': dp(24),
-                'disabled_color': (1, 1, 1, 1),
-                'size_hint': (None, None),
-                'size': (btn_width, dp(80)),
-                'on_press': self.check_answer
-            }
+            btn = Button(
+                size_hint=(None, None),
+                size=(btn_width, dp(80)),
+                on_press=self.check_answer)
+
+            btn.background_disabled_normal = btn.background_normal
+            btn.background_disabled_down = btn.background_down
+            btn.disabled_color = (1, 1, 1, 1)
 
             if self.invert_mode:
                 dots = current_braille[answer]
-                btn_properties['text'] = self.get_braille_char(dots)
-                btn_properties['font_name'] = 'BrailleFont'
+                btn.text = self.get_braille_char(dots)
+                btn.font_name = 'BrailleFont'
+                btn.font_size = dp(42)
             else:
-                btn_properties['text'] = answer
-                btn_properties['font_name'] = 'Roboto'
+                btn.text = answer
+                btn.font_name = 'Roboto'
+                btn.font_size = dp(24)
 
-            btn = Button(**btn_properties)
             btn.background_color = (1, 1, 1, 1)
-
             btn.answer_char = answer
 
             if answer == self.current_letter:
                 self.correct_button = btn
+
             grid.add_widget(btn)
 
     def on_pre_enter(self, *args):
+        for event in self.scheduled_events:
+            event.cancel()
+        self.scheduled_events.clear()
+
         self.update_lang()
         self.new_question()
         self.ids.answers_grid.bind(size=self._update_grid)
@@ -1088,6 +1112,9 @@ class PracticeScreen(BaseScreen):
         if self.clock_event:
             self.clock_event.cancel()
             self.clock_event = None
+        for event in self.scheduled_events:
+            event.cancel()
+        self.scheduled_events.clear()
         self.timer_active = False
 
     def update_lang(self):
@@ -1109,9 +1136,7 @@ class PracticeScreen(BaseScreen):
             weights[idx] *= 0.2
         self.current_letter = self.weighted_choice(items, weights)
         self.current_dots = current_braille[self.current_letter]
-
         self.invert_mode = random.random() < 0.5
-
         if not self.invert_mode:
             self.braille_char = self.get_braille_char(self.current_dots)
         else:
@@ -1122,10 +1147,8 @@ class PracticeScreen(BaseScreen):
         self.app.stats[lang].setdefault(self.current_letter, {'correct': 0, 'wrong': 0, 'last_seen': 0})
         self.app.stats[lang][self.current_letter]['last_seen'] = current_time
         self.app.save_stats()
-
         self.ids.answers_grid.clear_widgets()
         self._update_grid(None, self.ids.answers_grid.size)
-
         if self.quick_review_mode:
             self.start_timer()
 
@@ -1136,10 +1159,10 @@ class PracticeScreen(BaseScreen):
 
         for child in self.ids.answers_grid.children:
             child.disabled = True
+            child.disabled_color = (1, 1, 1, 1)
 
         lang = self.app.current_language
         char = self.current_letter
-
         chosen_char = getattr(instance, 'answer_char', instance.text)
 
         if chosen_char == char:
@@ -1155,50 +1178,37 @@ class PracticeScreen(BaseScreen):
                 if self.current_streak > self.app.high_scores[lang]['practice']:
                     self.app.high_scores[lang]['practice'] = self.current_streak
                     self.app.save_high_scores()
-
-            self.app.stats[lang][char] = {
-                'correct': self.app.stats[lang].get(char, {}).get('correct', 0) + 1,
-                'wrong': self.app.stats[lang].get(char, {}).get('wrong', 0),
-                'last_seen': time.time()
-            }
-            self.app.save_stats()
-            self.update_streak_text()
-
-            delay = 0.5 if self.quick_review_mode else 0.8
-            next_action = self.app.next_quick_step if self.quick_review_mode else lambda: self.reset_interface(False)
-            Clock.schedule_once(lambda dt: next_action(), delay)
+            self.app.stats[lang][char]['correct'] += 1
         else:
             instance.background_color = (1, 0, 0, 1)
             if self.correct_button:
                 self.correct_button.background_color = (0, 1, 0, 1)
 
-            self.app.stats[lang][char] = {
-                'correct': self.app.stats[lang].get(char, {}).get('correct', 0),
-                'wrong': self.app.stats[lang].get(char, {}).get('wrong', 0) + 1,
-                'last_seen': time.time()
-            }
-            self.app.save_stats()
-
             if self.quick_review_mode:
                 self.app.quick_streak -= 1
-                self.update_streak_text()
-                Clock.schedule_once(lambda dt: self.app.next_quick_step(), 0.8)
             else:
                 self.current_streak = 0
-                self.update_streak_text()
-                Clock.schedule_once(lambda dt: self.reset_interface(reset_streak=True), 1.2)
+            self.app.stats[lang][char]['wrong'] += 1
+
+        self.app.stats[lang][char]['last_seen'] = time.time()
+        self.app.save_stats()
+        self.update_streak_text()
+
+        delay = 0.5 if self.quick_review_mode else 0.8
+        next_action = self.app.next_quick_step if self.quick_review_mode else lambda: self.reset_interface(
+            chosen_char != char)
+        self.schedule_once(lambda dt: next_action(), delay if chosen_char == char else delay + 0.4)
 
     def reset_interface(self, reset_streak=False):
         def _reset(_):
-            if self.clock_event:
-                self.clock_event.cancel()
             for child in self.ids.answers_grid.children:
                 child.disabled = False
             if reset_streak:
+                self.current_streak = 0
                 self.update_streak_text()
             self.new_question()
 
-        Clock.schedule_once(_reset, 0)
+        self.schedule_once(_reset, 0)
 
 
 class MediumPracticeScreen(BaseScreen):
@@ -1222,6 +1232,12 @@ class MediumPracticeScreen(BaseScreen):
         self.dot_buttons = []
         self.score = 0
         self.current_streak = 0
+        self.scheduled_events = []
+
+    def schedule_once(self, callback, delay):
+        event = Clock.schedule_once(callback, delay)
+        self.scheduled_events.append(event)
+        return event
 
     def _enable_controls(self):
         if self.dot_buttons:
@@ -1238,6 +1254,10 @@ class MediumPracticeScreen(BaseScreen):
         self.clear_btn = self.get_translation('clear_btn')
 
     def on_pre_enter(self, *args):
+        for event in self.scheduled_events:
+            event.cancel()
+        self.scheduled_events.clear()
+
         self.update_lang()
         self.load_braille_data()
 
@@ -1254,6 +1274,9 @@ class MediumPracticeScreen(BaseScreen):
         if self.clock_event:
             self.clock_event.cancel()
             self.clock_event = None
+        for event in self.scheduled_events:
+            event.cancel()
+        self.scheduled_events.clear()
         self.timer_active = False
 
     def update_streak_text(self):
@@ -1263,13 +1286,12 @@ class MediumPracticeScreen(BaseScreen):
         else:
             current_value = self.current_streak
             record = self.app.high_scores[self.app.current_language].get('medium_practice', 0)
-
         self.streak_text = self.get_translation('streak').format(current_value, record)
 
     def start_timer(self):
         if self.clock_event:
             self.clock_event.cancel()
-        self.time_left = self.app.quick_review_time
+        self.time_left = self.app.quick_review_time + 1
         self.timer_active = True
         self.clock_event = Clock.schedule_interval(self.update_timer, 1)
 
@@ -1284,14 +1306,39 @@ class MediumPracticeScreen(BaseScreen):
             self.clock_event.cancel()
             self.clock_event = None
 
+        self._disable_and_show_correct_answer()
+
         if self.quick_review_mode:
             self.app.quick_streak -= 1
             self.update_streak_text()
-            Clock.schedule_once(lambda dt: self.app.next_quick_step(), 0.5)
+            self.schedule_once(lambda dt: self.app.next_quick_step(), 1.2)
+
+    def _disable_and_show_correct_answer(self, user_input=None):
+        if user_input is None:
+            user_input = [0] * 6
+
+        for btn in self.dot_buttons:
+            btn.disabled = True
+            btn.disabled_color = (1, 1, 1, 1)
+        self.ids.confirm_btn.disabled = True
+        self.ids.confirm_btn.disabled_color = (1, 1, 1, 1)
+        self.ids.clear_btn.disabled = True
+        self.ids.clear_btn.disabled_color = (1, 1, 1, 1)
+
+        for i, btn in enumerate(self.dot_buttons):
+            correct = self.current_dots[i]
+            user = user_input[i]
+            if correct and user:
+                btn.background_color = (0, 1, 0, 1)
+            elif correct and not user:
+                btn.background_color = (1, 0.7, 0, 1)
+            elif not correct and user:
+                btn.background_color = (1, 0, 0, 1)
+            else:
+                btn.background_color = (1, 1, 1, 1)
 
     def new_question(self):
         self._enable_controls()
-
         self.user_input = [0] * 6
         for btn in self.dot_buttons:
             btn.background_color = (1, 1, 1, 1)
@@ -1305,7 +1352,6 @@ class MediumPracticeScreen(BaseScreen):
         if hasattr(self, 'current_letter') and self.current_letter in items:
             idx = items.index(self.current_letter)
             weights[idx] *= 0.2
-
         self.current_letter = self.weighted_choice(items, weights)
         self.current_dots = current_braille[self.current_letter]
 
@@ -1315,7 +1361,6 @@ class MediumPracticeScreen(BaseScreen):
         self.app.stats[lang][self.current_letter]['last_seen'] = current_time
         self.app.save_stats()
 
-        # запускаем таймер если нужно
         if self.quick_review_mode:
             self.start_timer()
 
@@ -1324,47 +1369,20 @@ class MediumPracticeScreen(BaseScreen):
         instance.background_color = (0.7, 0.7, 0.7, 1) if self.user_input[index] else (1, 1, 1, 1)
 
     def confirm_answer(self):
-        for btn in self.dot_buttons:
-            btn.disabled = True
-            btn.disabled_color = (1, 1, 1, 1)
-        self.ids.confirm_btn.disabled = True
-        self.ids.confirm_btn.disabled_color = (1, 1, 1, 1)
-        self.ids.clear_btn.disabled = True
-        self.ids.clear_btn.disabled_color = (1, 1, 1, 1)
-
-        is_correct = self.user_input == self.current_dots
-
-        for i, btn in enumerate(self.dot_buttons):
-            correct = self.current_dots[i]
-            user = self.user_input[i]
-            if correct and user:
-                btn.background_color = (0, 1, 0, 1)
-            elif correct and not user:
-                btn.background_color = (1, 0.7, 0, 1)
-            elif not correct and user:
-                btn.background_color = (1, 0, 0, 1)
-            else:
-                btn.background_color = (1, 1, 1, 1)
-
         if self.timer_active:
             self.clock_event.cancel()
             self.timer_active = False
 
+        is_correct = self.user_input == self.current_dots
+        self._disable_and_show_correct_answer(self.user_input)
+
         lang = self.app.current_language
-
         if is_correct:
-            self.app.stats[lang][self.current_letter] = {
-                'correct': self.app.stats[lang].get(self.current_letter, {}).get('correct', 0) + 1,
-                'wrong': self.app.stats[lang].get(self.current_letter, {}).get('wrong', 0),
-                'last_seen': time.time()
-            }
+            self.app.stats[lang][self.current_letter]['correct'] += 1
         else:
-            self.app.stats[lang][self.current_letter] = {
-                'correct': self.app.stats[lang].get(self.current_letter, {}).get('correct', 0),
-                'wrong': self.app.stats[lang].get(self.current_letter, {}).get('wrong', 0) + 1,
-                'last_seen': time.time()
-            }
+            self.app.stats[lang][self.current_letter]['wrong'] += 1
 
+        self.app.stats[lang][self.current_letter]['last_seen'] = time.time()
         self.app.save_stats()
 
         if self.quick_review_mode:
@@ -1376,7 +1394,7 @@ class MediumPracticeScreen(BaseScreen):
             else:
                 self.app.quick_streak -= 1
             self.update_streak_text()
-            Clock.schedule_once(lambda dt: self.app.next_quick_step(), 1.2)
+            self.schedule_once(lambda dt: self.app.next_quick_step(), 1.2)
         else:
             if is_correct:
                 self.score += 1
@@ -1388,7 +1406,7 @@ class MediumPracticeScreen(BaseScreen):
                 self.score -= 1
                 self.current_streak = 0
             self.update_streak_text()
-            Clock.schedule_once(lambda dt: self.next_question(), 2)
+            self.schedule_once(lambda dt: self.next_question(), 2)
 
     def next_question(self):
         self.new_question()
@@ -1585,14 +1603,13 @@ class TranslatorScreen(BaseScreen):
     translate_btn = StringProperty()
     input_braille_btn = StringProperty()
     confirm_btn = StringProperty()
-    clear_btn = StringProperty()
+    delete_btn = StringProperty()
     braille_input_active = BooleanProperty(False)
     user_braille_dots = ListProperty([0] * 6)
     dot_buttons = ListProperty([])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # не обращаемся к self.ids здесь!
 
     def on_kv_post(self, base_widget):
         super().on_kv_post(base_widget)
@@ -1604,8 +1621,7 @@ class TranslatorScreen(BaseScreen):
             self.ids.dot3,
             self.ids.dot4,
             self.ids.dot5,
-            self.ids.dot6,
-        ]
+            self.ids.dot6,]
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
@@ -1619,7 +1635,7 @@ class TranslatorScreen(BaseScreen):
         self.translate_btn = self.get_translation('translate_btn')
         self.input_braille_btn = self.get_translation('input_braille_btn')
         self.confirm_btn = self.get_translation('confirm_btn')
-        self.clear_btn = self.get_translation('clear_btn')
+        self.delete_btn = self.get_translation('delete_btn')
 
     def translate_text(self):
         braille_text = []
@@ -1643,7 +1659,6 @@ class TranslatorScreen(BaseScreen):
         if self.braille_input_active:
             self.ids.braille_input_panel.opacity = 1
             self.ids.braille_input_panel.disabled = False
-            self.user_braille_dots = [0] * 6
             self.clear_braille_input()
         else:
             self.ids.braille_input_panel.opacity = 0
@@ -1660,10 +1675,15 @@ class TranslatorScreen(BaseScreen):
         self.ids.input_text.text += '?'
         self.clear_braille_input()
 
+    def delete_last_char(self):
+        if self.ids.input_text.text:
+            self.ids.input_text.text = self.ids.input_text.text[:-1]
+
     def clear_braille_input(self):
         self.user_braille_dots = [0] * 6
         for btn in self.dot_buttons:
             btn.background_color = (1, 1, 1, 1)
+
 
 
 class BrailleApp(App):
@@ -1675,7 +1695,7 @@ class BrailleApp(App):
     use_stats = BooleanProperty(True)
     quick_streak = NumericProperty(0)
     quick_active = BooleanProperty(False)
-    quick_mode_weights = DictProperty({'easy': 2, 'medium': 1})
+    quick_mode_weights = DictProperty({'easy': 3, 'medium': 1})
 
     def build(self):
         self.is_mobile = platform in ('android', 'ios')
