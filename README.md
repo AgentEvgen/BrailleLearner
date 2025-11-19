@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python)
 ![Kivy](https://img.shields.io/badge/Kivy-2.2%2B-ff6600?logo=kivy)
 
-> **BrailleLearner** — это приложение для **изучения и практики азбуки Брайля**.
+> **Braille Learner** — это приложение для **изучения и практики азбуки Брайля**.
 > Подходит для учащихся, педагогов, лингвистов и всех, кто интересуется тактильной письменностью.
 
 ---
