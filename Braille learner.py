@@ -2,6 +2,7 @@ from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListP
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
+from kivy.core.clipboard import Clipboard
 from kivy.uix.boxlayout import BoxLayout
 from kivy.core.text import LabelBase
 from kivy.uix.spinner import Spinner
@@ -635,9 +636,10 @@ Builder.load_string('''
             id: input_text
             hint_text: root.input_hint
             size_hint_y: None
-            height: dp(100)
+            height: dp(120)
             multiline: True
-            padding: dp(10)
+            padding: dp(12)
+            on_text: root.live_translate()
 
         BoxLayout:
             size_hint_y: None
@@ -646,10 +648,11 @@ Builder.load_string('''
             padding: 0
 
             BaseButton:
-                text: root.translate_btn
+                id: copy_btn
+                text: root.copy_btn
                 size_hint: (1, 1)
                 height: dp(60)
-                on_press: root.translate_text()
+                on_press: root.copy_braille_result()
 
             BaseButton:
                 text: root.input_braille_btn
@@ -901,6 +904,7 @@ translations = {
         'quick_review_header': 'Quick Review Settings',
         'medium_mode_header': 'Medium Mode Settings',
         'mirror_mode_label': 'Mirror Writing',
+        'copy_result': 'Copy',
 
     },
     'ru': {
@@ -927,6 +931,7 @@ translations = {
         'quick_review_header': 'Настройки быстрого повторения',
         'medium_mode_header': 'Настройки среднего режима',
         'mirror_mode_label': 'Зеркальное письмо',
+        'copy_result': 'Копировать',
     },
     'dru': {
         'menu_title': 'Главное меню', 'practice_btn': 'Практика', 'reference_btn': 'Справочникъ',
@@ -951,11 +956,11 @@ translations = {
         'quick_review_header': 'Настройки быстраго повторенія',
         'medium_mode_header': 'Настройки средняго режима',
         'mirror_mode_label': 'Зеркальное письмо',
+        'copy_result': 'Копировать',
     }
 }
 
 LANGUAGES = {'en': 'English', 'ru': 'Русский', 'dru': 'Дореволюціонный русскій'}
-
 
 class BaseScreen(Screen):
     back_btn = StringProperty()
@@ -973,8 +978,8 @@ class BaseScreen(Screen):
         self.back_btn = self.get_translation('back_btn')
 
     def get_translation(self, key):
-        lang = self.app.current_language if hasattr(self, 'app') and self.app else 'en'
-        return translations.get(lang, translations['en']).get(key, translations['en'].get(key, key))
+        lang = self.app.current_language if hasattr(self.app, 'current_language') else 'en'
+        return translations.get(lang, translations['en']).get(key, key)
 
     def load_braille_data(self):
         self.braille_data = self.app.braille_data[self.app.current_language]
@@ -1834,7 +1839,7 @@ class HardPracticeScreen(BaseScreen):
                          width=dp(50))
             btn.char_index = i
             btn.bind(on_press=self.on_braille_char_press)
-            btn.background_disabled_normal = btn.background_normal
+            btn.background_disabled_normal = btn.background_normalы
             box.add_widget(btn)
 
     def lock_controls(self, lock_all=True):
@@ -2126,22 +2131,20 @@ class ReferenceScreen(BaseScreen):
 class TranslatorScreen(BaseScreen):
     translator_title = StringProperty()
     input_hint = StringProperty()
-    translate_btn = StringProperty()
     input_braille_btn = StringProperty()
     confirm_btn = StringProperty()
     delete_btn = StringProperty()
+    copy_btn = StringProperty('Copy')
     braille_input_active = BooleanProperty(False)
     user_braille_dots = ListProperty([0] * 6)
     dot_buttons = ListProperty([])
+    _last_translated_text = StringProperty('')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.braille_to_char = {}
 
     def on_kv_post(self, base_widget):
-        super().on_kv_post(base_widget)
-        self.ids.braille_input_panel.opacity = 0
-        self.ids.braille_input_panel.disabled = True
         self.dot_buttons = [
             self.ids.dot1_trans, self.ids.dot2_trans, self.ids.dot3_trans,
             self.ids.dot4_trans, self.ids.dot5_trans, self.ids.dot6_trans]
@@ -2151,42 +2154,51 @@ class TranslatorScreen(BaseScreen):
         self.update_lang()
         self.load_braille_data()
         self.braille_to_char = {tuple(v): k for k, v in self.braille_data.items()}
+        Clock.schedule_once(lambda dt: self.live_translate(), 0.1)
 
     def update_lang(self):
         super().update_lang()
         self.translator_title = self.get_translation('translator_title')
         self.input_hint = self.get_translation('input_hint')
-        self.translate_btn = self.get_translation('translate_btn')
         self.input_braille_btn = self.get_translation('input_braille_btn')
         self.confirm_btn = self.get_translation('confirm_btn')
         self.delete_btn = self.get_translation('delete_btn')
+        self.copy_btn = self.get_translation('copy_result')
 
-    def translate_text(self):
-        braille_text = []
-        for char in self.ids.input_text.text.upper():
+    def live_translate(self, *args):
+        text = self.ids.input_text.text.upper()
+        if text == self._last_translated_text:
+            return
+
+        result = []
+        current_data = self.braille_data
+        for char in text:
             if char == ' ':
-                braille_text.append(chr(0x2800))
-            elif char in self.braille_data:
-                braille_text.append(self.get_braille_char(self.braille_data[char]))
+                result.append(chr(0x2800))
+            elif char in current_data:
+                result.append(self.get_braille_char(current_data[char]))
             else:
-                braille_text.append('?')
+                result.append('?')
 
-        self.ids.braille_output.text = ''.join(braille_text)
+        braille_text = ''.join(result)
+        self.ids.braille_output.text = braille_text
+        self._last_translated_text = text
 
     def on_braille_dot_press(self, index):
         self.user_braille_dots[index] = 1 - self.user_braille_dots[index]
-        button = self.dot_buttons[index]
-        button.background_color = (0.7, 0.7, 0.7, 1) if self.user_braille_dots[index] else (1, 1, 1, 1)
+        btn = self.dot_buttons[index]
+        btn.background_color = (0.7, 0.7, 0.7, 1) if self.user_braille_dots[index] else (1, 1, 1, 1)
 
     def open_braille_input(self):
         self.braille_input_active = not self.braille_input_active
+        panel = self.ids.braille_input_panel
         if self.braille_input_active:
-            self.ids.braille_input_panel.opacity = 1
-            self.ids.braille_input_panel.disabled = False
+            panel.opacity = 1
+            panel.disabled = False
             self.clear_braille_input()
         else:
-            self.ids.braille_input_panel.opacity = 0
-            self.ids.braille_input_panel.disabled = True
+            panel.opacity = 0
+            panel.disabled = True
 
     def close_braille_input(self):
         self.braille_input_active = False
@@ -2197,16 +2209,27 @@ class TranslatorScreen(BaseScreen):
         char = self.braille_to_char.get(tuple(self.user_braille_dots), '?')
         self.ids.input_text.text += char
         self.clear_braille_input()
+        self.ids.input_text.focus = True
 
     def delete_last_char(self):
-        if self.ids.input_text.text:
-            self.ids.input_text.text = self.ids.input_text.text[:-1]
+        text = self.ids.input_text.text
+        if text:
+            self.ids.input_text.text = text[:-1]
 
     def clear_braille_input(self):
         self.user_braille_dots = [0] * 6
         for btn in self.dot_buttons:
             btn.background_color = (1, 1, 1, 1)
 
+    def copy_braille_result(self):
+        text = self.ids.braille_output.text
+        if text and text != chr(0x2800):
+            Clipboard.copy(text)
+            btn = self.ids.copy_result_btn if hasattr(self.ids, 'copy_result_btn') else None
+            if btn:
+                original = btn.text
+                btn.text = '✓ Copied!'
+                self.schedule_once(lambda dt: setattr(btn, 'text', original), 1.5)
 
 class BrailleApp(App):
     current_language = StringProperty('en')
