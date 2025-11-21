@@ -26,7 +26,7 @@ import os
 
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
-LabelBase.register(name='BrailleFont', fn_regular='DejaVuSans.ttf')
+LabelBase.register(name='BrailleFont', fn_regular='assets/DejaVuSans.ttf')
 
 Builder.load_string('''
 <StreakHeader@BoxLayout>:
@@ -525,6 +525,32 @@ Builder.load_string('''
                         width: dp(150) if app.is_mobile else dp(200)
                         on_text: root.update_settings('difficulty', self.text)
 
+                BoxLayout:
+                    size_hint_y: None
+                    height: dp(60)
+                    spacing: dp(10)
+                    Label:
+                        text: root.include_letters
+                        size_hint_x: None
+                        width: dp(250)
+                    Switch:
+                        id: easy_letters_sw
+                        active: app.easy_mode_letters
+                        on_active: root.toggle_easy_letters(self.active)
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: dp(60)
+                    spacing: dp(10)
+                    Label:
+                        text: root.include_digits
+                        size_hint_x: None
+                        width: dp(250)
+                    Switch:
+                        id: easy_digits_sw
+                        active: app.easy_mode_digits
+                        on_active: root.toggle_easy_digits(self.active)
+
                 Widget:
                     size_hint_y: None
                     height: dp(15)
@@ -551,6 +577,32 @@ Builder.load_string('''
                         id: mirror_switch
                         active: app.mirror_writing_mode
                         on_active: root.update_mirror_mode(self.active)
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: dp(60)
+                    spacing: dp(10)
+                    Label:
+                        text: root.include_letters
+                        size_hint_x: None
+                        width: dp(250)
+                    Switch:
+                        id: medium_letters_sw
+                        active: app.medium_mode_letters
+                        on_active: root.toggle_medium_letters(self.active)
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: dp(60)
+                    spacing: dp(10)
+                    Label:
+                        text: root.include_digits
+                        size_hint_x: None
+                        width: dp(250)
+                    Switch:
+                        id: medium_digits_sw
+                        active: app.medium_mode_digits
+                        on_active: root.toggle_medium_digits(self.active)
 
                 Widget:
                     size_hint_y: None
@@ -603,6 +655,7 @@ Builder.load_string('''
         ScrollView:
             bar_width: dp(10)
             BoxLayout:
+                id: reference_container
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
@@ -880,6 +933,14 @@ braille_data = {
     ])
 }
 
+number_sign_dots = [0, 0, 1, 1, 1, 1]  # ⠼
+digits_data = OrderedDict([
+    ('1', [1, 0, 0, 0, 0, 0]), ('2', [1, 1, 0, 0, 0, 0]), ('3', [1, 0, 0, 1, 0, 0]),
+    ('4', [1, 0, 0, 1, 1, 0]), ('5', [1, 0, 0, 0, 1, 0]), ('6', [1, 1, 0, 1, 0, 0]),
+    ('7', [1, 1, 0, 1, 1, 0]), ('8', [1, 1, 0, 0, 1, 0]), ('9', [0, 1, 0, 1, 0, 0]),
+    ('0', [0, 1, 0, 1, 1, 0])
+])
+
 translations = {
     'en': {
         'menu_title': 'Main Menu', 'practice_btn': 'Practice', 'reference_btn': 'Reference', 'settings_btn': 'Settings',
@@ -905,6 +966,10 @@ translations = {
         'medium_mode_header': 'Medium Mode Settings',
         'mirror_mode_label': 'Mirror Writing',
         'copy_result': 'Copy',
+        'include_letters': 'Include letters',
+        'include_digits': 'Include digits',
+        'section_letters': 'letters',
+        'section_digits': 'digits',
 
     },
     'ru': {
@@ -932,6 +997,10 @@ translations = {
         'medium_mode_header': 'Настройки среднего режима',
         'mirror_mode_label': 'Зеркальное письмо',
         'copy_result': 'Копировать',
+        'include_letters': 'Включать буквы',
+        'include_digits': 'Включать цифры',
+        'section_letters': 'Буквы',
+        'section_digits': 'Цифры',
     },
     'dru': {
         'menu_title': 'Главное меню', 'practice_btn': 'Практика', 'reference_btn': 'Справочникъ',
@@ -957,16 +1026,25 @@ translations = {
         'medium_mode_header': 'Настройки средняго режима',
         'mirror_mode_label': 'Зеркальное письмо',
         'copy_result': 'Копировать',
+        'include_letters': 'Включать буквы',
+        'include_digits': 'Включать цифры',
+        'section_letters': 'Буквы',
+        'section_digits': 'Цифры',
+
     }
 }
 
 LANGUAGES = {'en': 'English', 'ru': 'Русский', 'dru': 'Дореволюціонный русскій'}
+
 
 class BaseScreen(Screen):
     back_btn = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.clock_event = None
+        self.scheduled_events = []
+        self.timer_active = False
         self.app = App.get_running_app()
         self.update_lang()
 
@@ -990,6 +1068,27 @@ class BaseScreen(Screen):
             if val:
                 code += 2 ** i
         return chr(code)
+
+    def start_timer(self, duration=None):
+        self.stop_timer()
+        if duration is None:
+            duration = self.app.quick_review_time
+
+        self.time_left = duration
+        self.timer_active = True
+        self.clock_event = Clock.schedule_interval(self.update_timer, 1)
+
+    def stop_timer(self):
+        if self.clock_event:
+            self.clock_event.cancel()
+            self.clock_event = None
+        self.timer_active = False
+
+    def update_timer(self, dt):
+        self.time_left -= 1
+        if self.time_left <= 0:
+            self.stop_timer()
+            self.handle_timeout()
 
     def calculate_weight(self, char, current_time):
         stat = self.app.stats[self.app.current_language].get(char,
@@ -1031,6 +1130,15 @@ class BaseScreen(Screen):
             if upto >= r:
                 return item
         return items[-1]
+
+    def on_leave(self, *args):
+        if self.clock_event:
+            self.clock_event.cancel()
+            self.clock_event = None
+        for event in self.scheduled_events:
+            event.cancel()
+        self.scheduled_events.clear()
+        self.timer_active = False
 
     def show_coming_soon(self):
         popup = Popup(title='',
@@ -1128,6 +1236,7 @@ class PracticeScreen(BaseScreen):
     timer_active = BooleanProperty(False)
     quick_review_mode = BooleanProperty(False)
     invert_mode = BooleanProperty(False)
+    current_symbol = StringProperty('')
 
     def __init__(self, **kwargs):
         self.current_streak = 0
@@ -1146,18 +1255,6 @@ class PracticeScreen(BaseScreen):
             current_value,
             self.app.high_scores[lang][record_type]
         )
-
-    def start_timer(self):
-        if self.clock_event:
-            self.clock_event.cancel()
-        self.time_left = self.app.quick_review_time
-        self.timer_active = True
-        self.clock_event = Clock.schedule_interval(self.update_timer, 1)
-
-    def update_timer(self, dt):
-        self.time_left -= 1
-        if self.time_left <= 0:
-            self.handle_timeout()
 
     def handle_timeout(self):
         self.timer_active = False
@@ -1182,13 +1279,25 @@ class PracticeScreen(BaseScreen):
     def _update_grid(self, instance, value):
         grid = self.ids.answers_grid
         grid.clear_widgets()
-        current_braille = braille_data[self.app.current_language]
 
-        answers = [self.current_letter]
+        pool = []
+        if self.app.easy_mode_letters:
+            pool.extend(braille_data[self.app.current_language].keys())
+        if self.app.easy_mode_digits:
+            pool.extend(digits_data.keys())
+
+        if not pool:
+            pool = list(braille_data[self.app.current_language].keys())
+
+        if not self.current_symbol:
+            return
+
+        answers = [self.current_symbol]
+
         while len(answers) < int(self.app.current_difficulty):
-            letter = random.choice(list(current_braille.keys()))
-            if letter not in answers:
-                answers.append(letter)
+            distractor = random.choice(pool)
+            if distractor not in answers:
+                answers.append(distractor)
         random.shuffle(answers)
 
         horizontal_padding = dp(20)
@@ -1216,6 +1325,7 @@ class PracticeScreen(BaseScreen):
         grid.spacing = spacing
         grid.row_default_height = final_row_height
         grid.row_force_default = True
+        ns = self.get_braille_char(number_sign_dots)
 
         for answer in answers:
             btn = Button(
@@ -1228,10 +1338,12 @@ class PracticeScreen(BaseScreen):
             btn.disabled_color = (1, 1, 1, 1)
 
             if self.invert_mode:
-                dots = current_braille[answer]
-                btn.text = self.get_braille_char(dots)
+                if answer in digits_data:
+                    btn.text = ns + self.get_braille_char(digits_data[answer])
+                else:
+                    btn.text = self.get_braille_char(braille_data[self.app.current_language][answer])
                 btn.font_name = 'BrailleFont'
-                btn.font_size = min(dp(42), final_row_height * 0.6)
+                btn.font_size = min(dp(38), final_row_height * 0.55)
             else:
                 btn.text = answer
                 btn.font_name = 'Roboto'
@@ -1240,7 +1352,7 @@ class PracticeScreen(BaseScreen):
             btn.background_color = (1, 1, 1, 1)
             btn.answer_char = answer
 
-            if answer == self.current_letter:
+            if answer == self.current_symbol:
                 self.correct_button = btn
 
             grid.add_widget(btn)
@@ -1255,14 +1367,8 @@ class PracticeScreen(BaseScreen):
         self.ids.answers_grid.bind(size=self._update_grid)
 
     def on_leave(self, *args):
+        super().on_leave(*args)
         self.ids.answers_grid.unbind(size=self._update_grid)
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
-        self.timer_active = False
 
     def update_lang(self):
         super().update_lang()
@@ -1274,30 +1380,48 @@ class PracticeScreen(BaseScreen):
             self.timer_active = False
 
         current_time = time.time()
-        current_braille = braille_data[self.app.current_language]
 
-        items = list(current_braille.keys())
-        weights = [self.calculate_weight(ch, current_time) for ch in items]
-        if hasattr(self, 'current_letter') and self.current_letter in items:
-            idx = items.index(self.current_letter)
+        pool = []
+        if self.app.easy_mode_letters:
+            pool.extend(braille_data[self.app.current_language].keys())
+        if self.app.easy_mode_digits:
+            pool.extend(digits_data.keys())
+
+        if not pool:
+            return
+
+        weights = [self.calculate_weight(ch, current_time) for ch in pool]
+
+        if hasattr(self, 'current_symbol') and self.current_symbol in pool:
+            idx = pool.index(self.current_symbol)
             weights[idx] *= 0.2
-        self.current_letter = self.weighted_choice(items, weights)
-        self.current_dots = current_braille[self.current_letter]
-        self.invert_mode = random.random() < 0.5
-        if not self.invert_mode:
-            self.braille_char = self.get_braille_char(self.current_dots)
+
+        self.current_symbol = self.weighted_choice(pool, weights)
+        self.is_digit = self.current_symbol in digits_data
+
+        if self.is_digit:
+            self.current_dots = digits_data[self.current_symbol]
         else:
-            self.braille_char = self.current_letter
+            self.current_dots = braille_data[self.app.current_language][self.current_symbol]
+
+        self.invert_mode = random.random() < 0.5
+
+        ns = self.get_braille_char(number_sign_dots)
+        if self.invert_mode:
+            self.braille_char = self.current_symbol
+        else:
+            if self.is_digit:
+                self.braille_char = ns + self.get_braille_char(self.current_dots)
+            else:
+                self.braille_char = self.get_braille_char(self.current_dots)
 
         lang = self.app.current_language
-        self.app.stats.setdefault(lang, {})
-        self.app.stats[lang].setdefault(self.current_letter, {'correct': 0, 'wrong': 0, 'last_seen': 0})
-        self.app.stats[lang][self.current_letter]['last_seen'] = current_time
+        self.app.stats[lang].setdefault(self.current_symbol, {'correct': 0, 'wrong': 0, 'last_seen': 0, 'hints': 0})
+        self.app.stats[lang][self.current_symbol]['last_seen'] = current_time
         self.app.save_stats()
+
         self.ids.answers_grid.clear_widgets()
-        self._update_grid(None, self.ids.answers_grid.size)
-        if self.quick_review_mode:
-            self.start_timer()
+        self._update_grid(None, None)
 
     def check_answer(self, instance):
         if self.timer_active:
@@ -1309,7 +1433,8 @@ class PracticeScreen(BaseScreen):
             child.disabled_color = (1, 1, 1, 1)
 
         lang = self.app.current_language
-        char = self.current_letter
+
+        char = self.current_symbol
         chosen_char = getattr(instance, 'answer_char', instance.text)
 
         if chosen_char == char:
@@ -1414,15 +1539,6 @@ class MediumPracticeScreen(BaseScreen):
         self.update_streak_text()
         self.new_question()
 
-    def on_leave(self, *args):
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
-        self.timer_active = False
-
     def update_streak_text(self):
         if self.quick_review_mode:
             current_value = self.app.quick_streak
@@ -1437,18 +1553,6 @@ class MediumPracticeScreen(BaseScreen):
             mapping = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
             return mapping.get(visual_index, visual_index)
         return visual_index
-
-    def start_timer(self):
-        if self.clock_event:
-            self.clock_event.cancel()
-        self.time_left = self.app.quick_review_time + 1
-        self.timer_active = True
-        self.clock_event = Clock.schedule_interval(self.update_timer, 1)
-
-    def update_timer(self, dt):
-        self.time_left -= 1
-        if self.time_left <= 0:
-            self.handle_timeout()
 
     def handle_timeout(self):
         self.timer_active = False
@@ -1498,20 +1602,34 @@ class MediumPracticeScreen(BaseScreen):
             btn.state = 'normal'
 
         current_time = time.time()
-        current_braille = self.braille_data
 
-        items = list(current_braille.keys())
-        weights = [self.calculate_weight(ch, current_time) for ch in items]
-        if hasattr(self, 'current_letter') and self.current_letter in items:
-            idx = items.index(self.current_letter)
+        pool = []
+        if self.app.medium_mode_letters:
+            pool.extend(braille_data[self.app.current_language].keys())
+        if self.app.medium_mode_digits:
+            pool.extend(digits_data.keys())
+
+        if not pool:
+            return
+
+        weights = [self.calculate_weight(ch, current_time) for ch in pool]
+
+        if hasattr(self, 'current_symbol') and self.current_symbol in pool:
+            idx = pool.index(self.current_symbol)
             weights[idx] *= 0.2
-        self.current_letter = self.weighted_choice(items, weights)
-        self.current_dots = current_braille[self.current_letter]
+
+        self.current_symbol = self.weighted_choice(pool, weights)
+
+        if self.current_symbol in digits_data:
+            self.current_dots = digits_data[self.current_symbol]
+        else:
+            self.current_dots = braille_data[self.app.current_language][self.current_symbol]
+
+        self.current_letter = self.current_symbol
 
         lang = self.app.current_language
-        self.app.stats.setdefault(lang, {})
-        self.app.stats[lang].setdefault(self.current_letter, {'correct': 0, 'wrong': 0, 'last_seen': 0, 'hints': 0})
-        self.app.stats[lang][self.current_letter]['last_seen'] = current_time
+        self.app.stats[lang].setdefault(self.current_symbol, {'correct': 0, 'wrong': 0, 'last_seen': 0, 'hints': 0})
+        self.app.stats[lang][self.current_symbol]['last_seen'] = current_time
         self.app.save_stats()
 
         if self.quick_review_mode:
@@ -1674,25 +1792,23 @@ class HardPracticeScreen(BaseScreen):
             record = self.app.high_scores[self.app.current_language].get('hard_practice', 0)
         self.streak_text = self.get_translation('streak').format(current_value, record)
 
-    def generate_word(self):
+    def generate_word(self, length=None):
+        lang = self.app.current_language
+        word_list = self.app.word_lists.get(lang)
+
+        if word_list:
+            if length:
+                filtered = [w for w in word_list if len(w) == length]
+                if filtered:
+                    return random.choice(filtered)
+            return random.choice(word_list)
+
         current_time = time.time()
         items = list(self.braille_data.keys())
         weights = [self.calculate_weight(ch, current_time) for ch in items]
-        length = random.randint(3, 6)
+        length = length if length else random.randint(3, 6)
         word_list = [self.weighted_choice(items, weights) for _ in range(length)]
         return "".join(word_list)
-
-    def start_timer(self):
-        if self.clock_event:
-            self.clock_event.cancel()
-        self.time_left = self.app.quick_review_time
-        self.timer_active = True
-        self.clock_event = Clock.schedule_interval(self.update_timer, 1)
-
-    def update_timer(self, dt):
-        self.time_left -= 1
-        if self.time_left <= 0:
-            self.handle_timeout()
 
     def handle_timeout(self):
         self.timer_active = False
@@ -1734,7 +1850,7 @@ class HardPracticeScreen(BaseScreen):
             self.sub_mode = random.choice(['A', 'B'])  # A - find / B - correct
             self.has_error = random.random() < 0.85
 
-        self.current_word = ''.join(self.weighted_choice(items, weights) for _ in range(length))
+        self.current_word = self.generate_word(length)
         self.current_word_text = self.current_word
 
         lang = self.app.current_language
@@ -1802,6 +1918,7 @@ class HardPracticeScreen(BaseScreen):
     def confirm_correction(self):
         if self._controls_locked:
             return
+        self.stop_timer()
         self.lock_controls(lock_all=False)
         self.correction_panel_visible = False
 
@@ -1839,7 +1956,7 @@ class HardPracticeScreen(BaseScreen):
                          width=dp(50))
             btn.char_index = i
             btn.bind(on_press=self.on_braille_char_press)
-            btn.background_disabled_normal = btn.background_normalы
+            btn.background_disabled_normal = btn.background_normal
             box.add_widget(btn)
 
     def lock_controls(self, lock_all=True):
@@ -1851,19 +1968,9 @@ class HardPracticeScreen(BaseScreen):
             self.ids.no_error_btn.disabled = True
             self.ids.no_error_btn.disabled_color = (1, 1, 1, 1)
 
-    def on_leave(self, *args):
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
-
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
-
-        self.timer_active = False
-
     def on_braille_char_press(self, instance):
         if self._controls_locked: return
+        self.stop_timer()
         self.lock_controls()
 
         if self.has_error and instance.char_index == self.error_index:
@@ -1890,6 +1997,7 @@ class HardPracticeScreen(BaseScreen):
 
     def on_no_error_press(self):
         if self._controls_locked: return
+        self.stop_timer()
         self.lock_controls()
 
         if not self.has_error:
@@ -1957,6 +2065,10 @@ class SettingsScreen(BaseScreen):
     quick_review_header = StringProperty()
     medium_mode_header = StringProperty()
     mirror_mode_label = StringProperty()
+    easy_content = StringProperty()
+    medium_content = StringProperty()
+    include_letters = StringProperty()
+    include_digits = StringProperty()
 
     def update_lang(self):
         super().update_lang()
@@ -1973,18 +2085,22 @@ class SettingsScreen(BaseScreen):
         self.quick_review_header = self.get_translation('quick_review_header')
         self.medium_mode_header = self.get_translation('medium_mode_header')
         self.mirror_mode_label = self.get_translation('mirror_mode_label')
+        self.easy_content = self.get_translation('easy_content')
+        self.medium_content = self.get_translation('medium_content')
+        self.include_letters = self.get_translation('include_letters')
+        self.include_digits = self.get_translation('include_digits')
         self.current_lang = LANGUAGES[lang]
         self.difficulty_values = [
             self.get_translation(f'difficulty_{d}')
             for d in ['2', '4', '6', '8', '10']]
         self.current_difficulty_str = self.get_translation(
-            f'difficulty_{self.app.current_difficulty}'
-        )
+            f'difficulty_{self.app.current_difficulty}')
 
     def update_settings(self, key, value):
         if key == 'language':
             lang_code = next((k for k, v in LANGUAGES.items() if v == value), 'en')
             self.app.current_language = lang_code
+            self.app.load_word_list(lang_code)
             self.current_lang = LANGUAGES[lang_code]
         elif key == 'difficulty':
             diff_code = next((k.split('_')[1] for k, v in translations[self.app.current_language].items()
@@ -2012,6 +2128,43 @@ class SettingsScreen(BaseScreen):
         ref_screen = self.app.root.get_screen('reference')
         if hasattr(ref_screen, 'update_reference'):
             ref_screen.update_reference()
+
+    def _prevent_both_off(self, mode):
+        if mode == 'easy':
+            if not self.app.easy_mode_letters and not self.app.easy_mode_digits:
+                return True
+        elif mode == 'medium':
+            if not self.app.medium_mode_letters and not self.app.medium_mode_digits:
+                return True
+        return False
+
+    def toggle_easy_letters(self, value):
+        self.app.easy_mode_letters = value
+        if not value and not self.app.easy_mode_digits:
+            self.app.easy_mode_digits = True
+            Clock.schedule_once(lambda dt: setattr(self.ids.easy_digits_sw, 'active', True))
+        self.app.save_settings()
+
+    def toggle_easy_digits(self, value):
+        self.app.easy_mode_digits = value
+        if not value and not self.app.easy_mode_letters:
+            self.app.easy_mode_letters = True
+            Clock.schedule_once(lambda dt: setattr(self.ids.easy_letters_sw, 'active', True))
+        self.app.save_settings()
+
+    def toggle_medium_letters(self, value):
+        self.app.medium_mode_letters = value
+        if not value and not self.app.medium_mode_digits:
+            self.app.medium_mode_digits = True
+            Clock.schedule_once(lambda dt: setattr(self.ids.medium_digits_sw, 'active', True))
+        self.app.save_settings()
+
+    def toggle_medium_digits(self, value):
+        self.app.medium_mode_digits = value
+        if not value and not self.app.medium_mode_letters:
+            self.app.medium_mode_letters = True
+            Clock.schedule_once(lambda dt: setattr(self.ids.medium_letters_sw, 'active', True))
+        self.app.save_settings()
 
     def reset_stats(self):
         popup = Popup(
@@ -2086,46 +2239,91 @@ class ReferenceScreen(BaseScreen):
         self.all_chars = list(self.app.braille_data[self.app.current_language].items())
 
     def update_reference(self):
-        grid = self.ids.reference_grid
-        grid.clear_widgets()
+        container = self.ids.reference_container
+        container.clear_widgets()
+
+        header_letters = Label(
+            text=self.get_translation('section_letters'),
+            font_size=dp(22),
+            size_hint_y=None,
+            height=dp(40),
+            halign='left',
+            valign='middle',
+            bold=True,
+            color=(0.8, 0.8, 0.8, 1)
+        )
+        header_letters.bind(size=header_letters.setter('text_size'))
+        container.add_widget(header_letters)
+
+        grid_letters = GridLayout(cols=2, spacing=dp(20), size_hint_y=None)
+        grid_letters.bind(minimum_height=grid_letters.setter('height'))
 
         for letter, dots in self.all_chars:
             braille_char = self.get_braille_char(dots)
+            self._add_item_to_grid(grid_letters, letter, braille_char, letter)
 
-            label_letter = Label(
-                text=letter,
-                font_size=dp(45),
+        container.add_widget(grid_letters)
+
+        container.add_widget(Widget(size_hint_y=None, height=dp(20)))
+
+        header_digits = Label(
+            text=self.get_translation('section_digits'),
+            font_size=dp(22),
+            size_hint_y=None,
+            height=dp(40),
+            halign='left',
+            valign='middle',
+            bold=True,
+            color=(0.8, 0.8, 0.8, 1)
+        )
+        header_digits.bind(size=header_digits.setter('text_size'))
+        container.add_widget(header_digits)
+
+        grid_digits = GridLayout(cols=2, spacing=dp(20), size_hint_y=None)
+        grid_digits.bind(minimum_height=grid_digits.setter('height'))
+
+        ns = self.get_braille_char(number_sign_dots)
+        for digit, dots in digits_data.items():
+            braille_char = ns + self.get_braille_char(dots)
+            self._add_item_to_grid(grid_digits, digit, braille_char, digit)
+
+        container.add_widget(grid_digits)
+
+    def _add_item_to_grid(self, grid, display_text, braille_text, stats_key):
+        label_text = Label(
+            text=display_text,
+            font_size=dp(45),
+            size_hint_y=None,
+            height=dp(60),
+            halign='center',
+            valign='middle'
+        )
+        grid.add_widget(label_text)
+
+        label_braille = Label(
+            text=braille_text,
+            font_name='BrailleFont',
+            font_size=dp(45),
+            size_hint_y=None,
+            height=dp(60),
+            halign='center',
+            valign='middle'
+        )
+        grid.add_widget(label_braille)
+
+        if self.app.use_stats:
+            stat = self.app.stats[self.app.current_language].get(stats_key, {'correct': 0, 'wrong': 0})
+            stats_label = Label(
+                text=self.get_translation('stats_label').format(stat['correct'], stat['wrong']),
+                font_size=dp(18),
                 size_hint_y=None,
-                height=dp(60),
+                height=dp(40),
                 halign='center',
-                valign='middle'
+                valign='middle',
+                color=(0.7, 0.7, 0.7, 1)
             )
-            grid.add_widget(label_letter)
-
-            label_braille = Label(
-                text=braille_char,
-                font_name='BrailleFont',
-                font_size=dp(45),
-                size_hint_y=None,
-                height=dp(60),
-                halign='center',
-                valign='middle'
-            )
-            grid.add_widget(label_braille)
-
-            if self.app.use_stats:
-                stat = self.app.stats[self.app.current_language].get(letter, {'correct': 0, 'wrong': 0})
-                stats_label = Label(
-                    text=self.get_translation('stats_label').format(stat['correct'], stat['wrong']),
-                    font_size=dp(18),
-                    size_hint_y=None,
-                    height=dp(40),
-                    halign='center',
-                    valign='middle',
-                    color=(0.7, 0.7, 0.7, 1)
-                )
-                grid.add_widget(stats_label)
-                grid.add_widget(Widget(size_hint_y=None, height=dp(10)))
+            grid.add_widget(stats_label)
+            grid.add_widget(Widget(size_hint_y=None, height=dp(10)))
 
 
 class TranslatorScreen(BaseScreen):
@@ -2143,6 +2341,7 @@ class TranslatorScreen(BaseScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.braille_to_char = {}
+        self.input_number_mode = False
 
     def on_kv_post(self, base_widget):
         self.dot_buttons = [
@@ -2172,13 +2371,26 @@ class TranslatorScreen(BaseScreen):
 
         result = []
         current_data = self.braille_data
+        in_number_mode = False
+        ns = self.get_braille_char(number_sign_dots)
+
         for char in text:
-            if char == ' ':
-                result.append(chr(0x2800))
-            elif char in current_data:
-                result.append(self.get_braille_char(current_data[char]))
+            if char.isdigit():
+                if not in_number_mode:
+                    result.append(ns)
+                    in_number_mode = True
+                if char in digits_data:
+                    result.append(self.get_braille_char(digits_data[char]))
+                else:
+                    result.append('?')
             else:
-                result.append('?')
+                in_number_mode = False
+                if char == ' ':
+                    result.append(chr(0x2800))
+                elif char in current_data:
+                    result.append(self.get_braille_char(current_data[char]))
+                else:
+                    result.append('?')
 
         braille_text = ''.join(result)
         self.ids.braille_output.text = braille_text
@@ -2196,6 +2408,8 @@ class TranslatorScreen(BaseScreen):
             panel.opacity = 1
             panel.disabled = False
             self.clear_braille_input()
+            self.input_number_mode = False
+            self.ids.input_text.focus = False
         else:
             panel.opacity = 0
             panel.disabled = True
@@ -2206,10 +2420,34 @@ class TranslatorScreen(BaseScreen):
         self.ids.braille_input_panel.disabled = True
 
     def confirm_braille_input(self):
-        char = self.braille_to_char.get(tuple(self.user_braille_dots), '?')
+        input_dots = tuple(self.user_braille_dots)
+
+        if all(d == 0 for d in input_dots):
+            self.ids.input_text.text += ' '
+            self.input_number_mode = False
+            self.clear_braille_input()
+            return
+
+        if input_dots == tuple(number_sign_dots):
+            self.input_number_mode = True
+            self.clear_braille_input()
+            return
+
+        char = '?'
+        if self.input_number_mode:
+            found_digit = False
+            for digit, dots in digits_data.items():
+                if tuple(dots) == input_dots:
+                    char = digit
+                    found_digit = True
+                    break
+            if not found_digit:
+                char = self.braille_to_char.get(input_dots, '?')
+        else:
+            char = self.braille_to_char.get(input_dots, '?')
+
         self.ids.input_text.text += char
         self.clear_braille_input()
-        self.ids.input_text.focus = True
 
     def delete_last_char(self):
         text = self.ids.input_text.text
@@ -2225,11 +2463,7 @@ class TranslatorScreen(BaseScreen):
         text = self.ids.braille_output.text
         if text and text != chr(0x2800):
             Clipboard.copy(text)
-            btn = self.ids.copy_result_btn if hasattr(self.ids, 'copy_result_btn') else None
-            if btn:
-                original = btn.text
-                btn.text = '✓ Copied!'
-                self.schedule_once(lambda dt: setattr(btn, 'text', original), 1.5)
+
 
 class BrailleApp(App):
     current_language = StringProperty('en')
@@ -2242,6 +2476,11 @@ class BrailleApp(App):
     quick_active = BooleanProperty(False)
     quick_mode_weights = DictProperty({'easy': 40, 'medium': 30, 'hard': 30})
     mirror_writing_mode = BooleanProperty(False)
+    word_lists = DictProperty({})
+    easy_mode_letters = BooleanProperty(True)
+    easy_mode_digits = BooleanProperty(True)
+    medium_mode_letters = BooleanProperty(True)
+    medium_mode_digits = BooleanProperty(True)
 
     def build(self):
         self.is_mobile = platform in ('android', 'ios')
@@ -2249,6 +2488,7 @@ class BrailleApp(App):
         self.load_settings()
         self.load_high_scores()
         self.load_stats()
+        self.load_word_list(self.current_language)
         sm = ScreenManager()
         sm.add_widget(MenuScreen(name='menu'))
         sm.add_widget(LearningScreen(name='learning'))
@@ -2304,6 +2544,20 @@ class BrailleApp(App):
     def _path(self, filename):
         return os.path.join(self.user_data_dir, filename)
 
+    def load_word_list(self, lang):
+        path = os.path.join("assets", "words", f"{lang}.txt")
+        if not os.path.exists(path):
+            self.word_lists[lang] = None
+            return
+        try:
+            with open(path, encoding='utf-8') as f:
+                words = [line.strip().upper() for line in f if line.strip()]
+                words = [w for w in words if all(c in braille_data[lang] for c in w)]
+                self.word_lists[lang] = words if words else None
+        except Exception as e:
+            print(f"Error loading words for {lang}: {e}")
+            self.word_lists[lang] = None
+
     def load_settings(self):
         try:
             with open(self._path("settings.json"), "r", encoding="utf-8") as f:
@@ -2313,6 +2567,10 @@ class BrailleApp(App):
             self.quick_review_time = data.get('quick_review_time', 5)
             self.use_stats = data.get('use_stats', True)
             self.mirror_writing_mode = data.get('mirror_writing_mode', False)
+            self.easy_mode_letters = data.get('easy_mode_letters', True)
+            self.easy_mode_digits = data.get('easy_mode_digits', True)
+            self.medium_mode_letters = data.get('medium_mode_letters', True)
+            self.medium_mode_digits = data.get('medium_mode_digits', True)
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
@@ -2323,7 +2581,11 @@ class BrailleApp(App):
                 'difficulty': self.current_difficulty,
                 'quick_review_time': self.quick_review_time,
                 'use_stats': self.use_stats,
-                'mirror_writing_mode': self.mirror_writing_mode
+                'mirror_writing_mode': self.mirror_writing_mode,
+                'easy_mode_letters': self.easy_mode_letters,
+                'easy_mode_digits': self.easy_mode_digits,
+                'medium_mode_letters': self.medium_mode_letters,
+                'medium_mode_digits': self.medium_mode_digits,
             }, f, ensure_ascii=False, indent=2)
         self.save_high_scores()
         self.save_stats()
