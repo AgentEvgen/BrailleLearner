@@ -64,12 +64,6 @@ Builder.load_string('''
     height: dp(80)
     padding: dp(10), dp(10)
 
-<BaseScreen>:
-    BoxLayout:
-        orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(20)
-
 <MenuScreen>:
     BoxLayout:
         orientation: 'vertical'
@@ -95,20 +89,20 @@ Builder.load_string('''
                 spacing: dp(15)
                 BaseButton:
                     text: root.training_btn
-                    on_press: root.manager.current = 'lessons'
+                    on_press: app.switch_screen('lessons')
                 BaseButton:
                     id: practice_btn
                     text: root.practice_btn
-                    on_press: root.manager.current = 'practice_levels'
+                    on_press: app.switch_screen('practice_levels')
                 BaseButton:
                     text: root.reference_btn
-                    on_press: root.manager.current = 'reference'
+                    on_press: app.switch_screen('reference')
                 BaseButton:
                     text: root.translator_btn
-                    on_press: root.manager.current = 'translator'
+                    on_press: app.switch_screen('translator')
                 BaseButton:
                     text: root.settings_btn
-                    on_press: root.manager.current = 'settings'
+                    on_press: app.switch_screen('settings')
         Widget:
             size_hint_y: None
             height: dp(15)
@@ -157,7 +151,7 @@ Builder.load_string('''
         BaseButton:
             text: root.back_btn
             height: dp(50)
-            on_press: root.manager.current = 'menu'
+            on_press: app.switch_screen('menu')
 
 <LessonStudyScreen>:
     BoxLayout:
@@ -197,7 +191,7 @@ Builder.load_string('''
             BaseButton:
                 text: root.back_btn
                 height: dp(50)
-                on_press: root.manager.current = 'lessons'
+                on_press: app.switch_screen('lessons')
 
 <LessonTestScreen>:
     BoxLayout:
@@ -241,7 +235,7 @@ Builder.load_string('''
             BaseButton:
                 text: root.back_btn
                 height: dp(50)
-                on_press: root.manager.current = 'lessons'
+                on_press: app.switch_screen('lessons')
 
 <PracticeScreen>:
     BoxLayout:
@@ -281,7 +275,7 @@ Builder.load_string('''
             on_press:
                 root.quick_review_mode = False
                 app.stop_quick_review()
-                root.manager.current = 'practice_levels'
+                app.switch_screen('practice_levels')
 
 <MediumPracticeScreen>:
     BoxLayout:
@@ -419,7 +413,7 @@ Builder.load_string('''
             on_press:
                 root.quick_review_mode = False
                 app.stop_quick_review()
-                root.manager.current = 'practice_levels'
+                app.switch_screen('practice_levels')
 
 <HardPracticeScreen>:
     FloatLayout:
@@ -478,7 +472,7 @@ Builder.load_string('''
                 on_press: 
                     root.quick_review_mode = False
                     app.stop_quick_review()
-                    root.manager.current = 'practice_levels'
+                    app.switch_screen('practice_levels')
 
         BoxLayout:
             id: correction_panel
@@ -726,7 +720,7 @@ Builder.load_string('''
         BaseButton:
             text: root.back_btn
             height: dp(50)
-            on_press: root.manager.current = 'menu'
+            on_press: app.switch_screen('menu')
 
 <ReferenceScreen>:
     BoxLayout:
@@ -757,7 +751,7 @@ Builder.load_string('''
         BaseButton:
             text: root.back_btn
             height: dp(50)
-            on_press: root.manager.current = 'menu'
+            on_press: app.switch_screen('menu')
 
 <TranslatorScreen>:
     BoxLayout:
@@ -811,23 +805,11 @@ Builder.load_string('''
                 bar_width: dp(10)
 
                 BoxLayout:
+                    id: braille_output_box
                     size_hint_y: None
                     height: self.minimum_height
                     orientation: 'vertical'
-
-                    Label:
-                        id: braille_output
-                        text: ''
-                        font_name: 'BrailleFont'
-                        font_size: dp(32)
-                        size_hint_y: None
-                        height: self.texture_size[1]
-                        text_size: (self.width, None)
-                        halign: 'center'
-                        valign: 'top'
-                        padding: dp(10), dp(10)
-                        pos_hint: {'center_x': 0.5}
-                        width: self.parent.width
+                    padding: dp(10)
 
             BoxLayout:
                 id: braille_input_panel
@@ -937,7 +919,7 @@ Builder.load_string('''
             height: dp(50)
             on_press:
                 root.close_braille_input()
-                root.manager.current = 'menu'
+                app.switch_screen('menu')
 
 <PracticeLevelsScreen>:
     BoxLayout:
@@ -977,7 +959,7 @@ Builder.load_string('''
             text: root.back_btn
             size_hint_y: None
             height: dp(50)
-            on_press: root.manager.current = 'menu'
+            on_press: app.switch_screen('menu')
 ''')
 
 braille_data = {
@@ -1047,7 +1029,6 @@ translations = {
         'reset_stats_text': 'Are you sure you want to reset all statistics?',
         'yes': 'Yes', 'no': 'No', 'stats_label': 'Correct: {} \n Wrong: {}', "confirm_btn": "Confirm",
         "hint_btn": "Hint", 'input_braille_btn': 'Input Braille', 'delete_btn': 'Delete',
-        'hard_level_title_find': 'Find the error', 'hard_level_title_correct': 'Correct the error',
         'no_errors_btn': 'No errors', 'general_settings_header': 'General Settings',
         'easy_mode_header': 'Easy Mode Settings',
         'quick_review_header': 'Quick Review Settings',
@@ -1056,8 +1037,9 @@ translations = {
         'copy_result': 'Copy',
         'include_letters': 'Include letters',
         'include_digits': 'Include digits',
-        'section_letters': 'letters',
-        'section_digits': 'digits',
+        'section_letters': 'Letters',
+        'section_digits': 'Digits',
+        'Test': 'Test',
         'lessons_title': 'Lessons', 'study': 'Study',
         'practice_only': 'Practice', 'lesson': 'Lesson', 'letters_label': 'Letters: {}', 'start': 'Start',
         'continue': 'Continue', 'locked': 'Locked', 'complete_lesson': 'Complete lesson',
@@ -1083,7 +1065,6 @@ translations = {
         'reset_stats_title': 'Сброс статистики', 'reset_stats_text': 'Вы уверены, что хотите сбросить всю статистику?',
         'yes': 'Да', 'no': 'Нет', 'stats_label': 'Правильно: {} \n Ошибок: {}', "confirm_btn": "Подтвердить",
         "hint_btn": "Подсказка", 'input_braille_btn': 'Ввод Брайля', 'delete_btn': 'Удалить',
-        'hard_level_title_find': 'Найди ошибку', 'hard_level_title_correct': 'Исправь ошибку',
         'no_errors_btn': 'Ошибок нет',
         'general_settings_header': 'Общие настройки',
         'easy_mode_header': 'Настройки простого режима',
@@ -1095,6 +1076,7 @@ translations = {
         'include_digits': 'Включать цифры',
         'section_letters': 'Буквы',
         'section_digits': 'Цифры',
+        'Test': 'Зачёт',
         'lessons_title': 'Уроки', 'study': 'Обучение',
         'practice_only': 'Практика', 'lesson': 'Урок', 'letters_label': 'Буквы: {}', 'start': 'Начать',
         'continue': 'Продолжить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урок',
@@ -1119,7 +1101,6 @@ translations = {
         'reset_stats_title': 'Сбросъ статистики', 'reset_stats_text': 'Вы увѣрены, что хотите сбросить всю статистику?',
         'yes': 'Да', 'no': 'Нѣтъ', 'stats_label': 'Правильно: {} \n Ошибокъ: {}', "confirm_btn": "Подтвердить",
         "hint_btn": "Подсказка", 'input_braille_btn': 'Вводъ Брайля', 'delete_btn': 'Удалить',
-        'hard_level_title_find': 'Найди ошибку', 'hard_level_title_correct': 'Исправь ошибку',
         'no_errors_btn': 'Ошибокъ нѣтъ', 'general_settings_header': 'Общіе настройки',
         'easy_mode_header': 'Настройки простого режима',
         'quick_review_header': 'Настройки быстраго повторенія',
@@ -1130,6 +1111,7 @@ translations = {
         'include_digits': 'Включать цифры',
         'section_letters': 'Буквы',
         'section_digits': 'Цифры',
+        'Test': 'Зачетъ',
         'lessons_title': 'Уроки', 'study': 'Обученіе',
         'practice_only': 'Практика', 'lesson': 'Урокъ', 'letters_label': 'Буквы: {}', 'start': 'Начать',
         'continue': 'Продолжить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урокъ',
@@ -1170,9 +1152,12 @@ class BaseScreen(Screen):
 
     def get_braille_char(self, dots):
         code = 0x2800
-        for i, val in enumerate(dots):
-            if val:
-                code += 2 ** i
+        if dots[0]: code |= 0x01
+        if dots[1]: code |= 0x02
+        if dots[2]: code |= 0x04
+        if dots[3]: code |= 0x08
+        if dots[4]: code |= 0x10
+        if dots[5]: code |= 0x20
         return chr(code)
 
     def start_timer(self, duration=None):
@@ -1197,6 +1182,9 @@ class BaseScreen(Screen):
             self.handle_timeout()
 
     def calculate_weight(self, char, current_time):
+        if not getattr(self.app, 'use_stats', True):
+            return 1.0
+
         stat = self.app.stats[self.app.current_language].get(char,
                                                              {'correct': 0, 'wrong': 0, 'last_seen': 0, 'hints': 0})
         last_seen = stat.get('last_seen', 0) or (current_time - 3600)
@@ -1334,15 +1322,15 @@ class LessonsScreen(BaseScreen):
                 mode_title = self.get_translation('study')
             elif mode == 'practice':
                 mode_title = self.get_translation('practice_only')
-            else:  # exam
-                mode_title = "Зачет"
+            else:
+                mode_title = self.get_translation('Test')
 
             title = f"{self.get_translation('lesson')} {idx}: {mode_title}"
             row.add_widget(Label(text=title, size_hint_y=None, height=dp(28), font_size=dp(18),
                                  halign='left', valign='middle'))
 
             letters_text = self.get_translation('letters_label').format(
-                ' '.join(lesson['letters']) if lesson['letters'] else "Все")
+                ' '.join(lesson['letters']))
             row.add_widget(Label(text=letters_text, size_hint_y=None, height=dp(24), font_size=dp(16),
                                  halign='left', valign='middle'))
 
@@ -1372,14 +1360,14 @@ class LessonsScreen(BaseScreen):
         lesson = app.get_lessons(lang, self.current_mode)[lesson_index]
 
         if lesson['mode'] == 'study':
-            scr = self.manager.get_screen('lesson_study')
+            scr = app.get_screen('lesson_study')
             scr.set_lesson(lesson_index, lesson['letters'], self.current_mode)
-            self.manager.current = 'lesson_study'
+            app.switch_screen('lesson_study')
         else:
-            scr = self.manager.get_screen('lesson_test')
+            scr = app.get_screen('lesson_test')
             is_exam = lesson.get('mode') == 'exam'
             scr.set_lesson(lesson_index, lesson['letters'], is_final_exam=is_exam, lesson_type=self.current_mode)
-            self.manager.current = 'lesson_test'
+            app.switch_screen('lesson_test')
 
 
 class LessonStudyScreen(BaseScreen):
@@ -1428,7 +1416,7 @@ class LessonStudyScreen(BaseScreen):
 
     def finish_lesson(self):
         self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type)
-        self.manager.current = 'lessons'
+        self.app.switch_screen('lessons')
 
 
 class LessonTestScreen(BaseScreen):
@@ -1567,21 +1555,23 @@ class LessonTestScreen(BaseScreen):
         self.schedule_once(self.next_question, 0.8)
 
     def finish_test(self):
-        passed = self.correct >= math.ceil(1 * self.questions_total)
+        required_ratio = 0.9
+        passed = self.correct >= math.ceil(required_ratio * self.questions_total)
         title = self.get_translation('test_passed') if passed else self.get_translation('test_failed')
         popup = Popup(title=title, size_hint=(None, None), size=(dp(320), dp(200)))
 
         def close_and_back(*_):
             popup.dismiss()
-            self.manager.current = 'lessons'
+            self.app.switch_screen('lessons')
 
         if passed:
             self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type)
 
+        percent = int(self.correct / self.questions_total * 100)
         btn = Button(text=self.get_translation('ok'), size_hint=(1, None), height=dp(50))
         btn.bind(on_press=close_and_back)
         layout = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
-        layout.add_widget(Label(text=f"{self.correct}/{self.questions_total}", size_hint=(1, 1)))
+        layout.add_widget(Label(text=f"{self.correct}/{self.questions_total} ({percent}%)", size_hint=(1, 1)))
         layout.add_widget(btn)
         popup.content = layout
         popup.open()
@@ -1779,6 +1769,9 @@ class PracticeScreen(BaseScreen):
 
         self.ids.answers_grid.clear_widgets()
         self._update_grid(None, None)
+
+        if self.quick_review_mode:
+            self.start_timer()
 
     def check_answer(self, instance):
         if self.timer_active:
@@ -2087,7 +2080,6 @@ class MediumPracticeScreen(BaseScreen):
 
 
 class HardPracticeScreen(BaseScreen):
-    title = StringProperty()
     streak_text = StringProperty(" \n ")
     current_word_text = StringProperty()
     no_errors_btn = StringProperty()
@@ -2226,8 +2218,6 @@ class HardPracticeScreen(BaseScreen):
                                         if c != self.current_word[self.error_index]])
             self.displayed_braille_word[self.error_index] = self.braille_data[wrong_char]
 
-        self.title = self.get_translation('hard_level_title_find')
-
         self.update_braille_display()
 
         if self.quick_review_mode:
@@ -2335,7 +2325,6 @@ class HardPracticeScreen(BaseScreen):
                 instance.background_color = (0, 1, 0, 1)
                 self.handle_correct_answer()
             else:
-                self.title = self.get_translation('hard_level_title_correct')
                 instance.background_color = (1, 0.7, 0, 1)
                 self.correction_panel_visible = True
                 self._controls_locked = False
@@ -2392,17 +2381,18 @@ class PracticeLevelsScreen(BaseScreen):
         App.get_running_app().start_quick_review()
 
     def start_medium_level(self):
-        self.manager.current = 'medium_practice'
-        self.manager.get_screen('medium_practice').quick_review_mode = False
+        scr = self.app.get_screen('medium_practice')
+        scr.quick_review_mode = False
+        self.app.switch_screen('medium_practice')
 
     def start_easy_level(self):
-        practice_screen = self.manager.get_screen('practice')
-        self.manager.current = 'practice'
-        practice_screen.quick_review_mode = False
-        practice_screen.new_question()
+        scr = self.app.get_screen('practice')
+        scr.quick_review_mode = False
+        self.app.switch_screen('practice')
+        scr.new_question()
 
     def start_hard_level(self):
-        self.manager.current = 'hard_practice'
+        self.app.switch_screen('hard_practice')
 
 
 class SettingsScreen(BaseScreen):
@@ -2422,8 +2412,6 @@ class SettingsScreen(BaseScreen):
     quick_review_header = StringProperty()
     medium_mode_header = StringProperty()
     mirror_mode_label = StringProperty()
-    easy_content = StringProperty()
-    medium_content = StringProperty()
     include_letters = StringProperty()
     include_digits = StringProperty()
 
@@ -2442,8 +2430,6 @@ class SettingsScreen(BaseScreen):
         self.quick_review_header = self.get_translation('quick_review_header')
         self.medium_mode_header = self.get_translation('medium_mode_header')
         self.mirror_mode_label = self.get_translation('mirror_mode_label')
-        self.easy_content = self.get_translation('easy_content')
-        self.medium_content = self.get_translation('medium_content')
         self.include_letters = self.get_translation('include_letters')
         self.include_digits = self.get_translation('include_digits')
         self.current_lang = LANGUAGES[lang]
@@ -2482,9 +2468,10 @@ class SettingsScreen(BaseScreen):
     def update_update_use_stats(self, active):
         self.app.use_stats = active
         self.app.save_settings()
-        ref_screen = self.app.root.get_screen('reference')
-        if hasattr(ref_screen, 'update_reference'):
-            ref_screen.update_reference()
+        if 'reference' in self.app._loaded_screens:
+            ref_screen = self.app.get_screen('reference')
+            if hasattr(ref_screen, 'update_reference'):
+                ref_screen.update_reference()
 
     def _prevent_both_off(self, mode):
         if mode == 'easy':
@@ -2680,11 +2667,12 @@ class TranslatorScreen(BaseScreen):
     input_braille_btn = StringProperty()
     confirm_btn = StringProperty()
     delete_btn = StringProperty()
-    copy_btn = StringProperty('Copy')
+    copy_btn = StringProperty('')
     braille_input_active = BooleanProperty(False)
     user_braille_dots = ListProperty([0] * 6)
     dot_buttons = ListProperty([])
     _last_translated_text = StringProperty('')
+    full_braille_text = StringProperty('')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -2698,7 +2686,6 @@ class TranslatorScreen(BaseScreen):
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
-        self.update_lang()
         self.load_braille_data()
         self.braille_to_char = {tuple(v): k for k, v in self.braille_data.items()}
         Clock.schedule_once(lambda dt: self.live_translate(), 0.1)
@@ -2723,6 +2710,11 @@ class TranslatorScreen(BaseScreen):
         ns = self.get_braille_char(number_sign_dots)
 
         for char in text:
+            if char == '\n':
+                result.append('\n')
+                in_number_mode = False
+                continue
+
             if char.isdigit():
                 if not in_number_mode:
                     result.append(ns)
@@ -2731,18 +2723,48 @@ class TranslatorScreen(BaseScreen):
                     result.append(self.get_braille_char(digits_data[char]))
                 else:
                     result.append('?')
+                continue
+
+            in_number_mode = False
+            if char == ' ':
+                result.append(chr(0x2800))
+            elif char in current_data:
+                result.append(self.get_braille_char(current_data[char]))
             else:
-                in_number_mode = False
-                if char == ' ':
-                    result.append(chr(0x2800))
-                elif char in current_data:
-                    result.append(self.get_braille_char(current_data[char]))
-                else:
-                    result.append('?')
+                result.append('?')
 
         braille_text = ''.join(result)
-        self.ids.braille_output.text = braille_text
+        self.full_braille_text = braille_text
         self._last_translated_text = text
+
+        output_box = self.ids.braille_output_box
+        output_box.clear_widgets()
+
+        chunk_size = 500
+        if not braille_text:
+            chunks = []
+        else:
+            chunks = [braille_text[i:i + chunk_size] for i in range(0, len(braille_text), chunk_size)]
+
+        for chunk in chunks:
+            lbl = Label(
+                text=chunk,
+                font_name='BrailleFont',
+                font_size=dp(32),
+                size_hint_y=None,
+                color=(1, 1, 1, 1),
+                halign='center',
+                valign='top'
+            )
+            lbl.bind(width=lambda instance, value: setattr(instance, 'text_size', (value, None)))
+            lbl.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
+
+            output_box.add_widget(lbl)
+
+    def copy_braille_result(self):
+        text = self.full_braille_text
+        if text and text != chr(0x2800):
+            Clipboard.copy(text)
 
     def on_braille_dot_press(self, index):
         self.user_braille_dots[index] = 1 - self.user_braille_dots[index]
@@ -2764,8 +2786,11 @@ class TranslatorScreen(BaseScreen):
 
     def close_braille_input(self):
         self.braille_input_active = False
-        self.ids.braille_input_panel.opacity = 0
-        self.ids.braille_input_panel.disabled = True
+        if self.ids:
+            panel = self.ids.get('braille_input_panel')
+            if panel:
+                panel.opacity = 0
+                panel.disabled = True
 
     def confirm_braille_input(self):
         input_dots = tuple(self.user_braille_dots)
@@ -2807,10 +2832,9 @@ class TranslatorScreen(BaseScreen):
         for btn in self.dot_buttons:
             btn.background_color = (1, 1, 1, 1)
 
-    def copy_braille_result(self):
-        text = self.ids.braille_output.text
-        if text and text != chr(0x2800):
-            Clipboard.copy(text)
+    def on_leave(self, *args):
+        super().on_leave(*args)
+        self.close_braille_input()
 
 
 class BrailleApp(App):
@@ -2832,6 +2856,22 @@ class BrailleApp(App):
     lessons_config = DictProperty({})
     lessons_progress = DictProperty({})
 
+    _screen_classes = {
+        'menu': MenuScreen,
+        'lessons': LessonsScreen,
+        'lesson_study': LessonStudyScreen,
+        'lesson_test': LessonTestScreen,
+        'practice_levels': PracticeLevelsScreen,
+        'practice': PracticeScreen,
+        'medium_practice': MediumPracticeScreen,
+        'hard_practice': HardPracticeScreen,
+        'reference': ReferenceScreen,
+        'translator': TranslatorScreen,
+        'settings': SettingsScreen,
+    }
+
+    _loaded_screens = set()
+
     def build(self):
         self.is_mobile = platform in ('android', 'ios')
         self.braille_data = braille_data
@@ -2842,18 +2882,45 @@ class BrailleApp(App):
         self.load_word_list(self.current_language)
         self.digits_lessons = self.build_digits_lessons()
         sm = ScreenManager()
-        sm.add_widget(MenuScreen(name='menu'))
-        sm.add_widget(LessonsScreen(name='lessons'))
-        sm.add_widget(LessonStudyScreen(name='lesson_study'))
-        sm.add_widget(LessonTestScreen(name='lesson_test'))
-        sm.add_widget(PracticeLevelsScreen(name='practice_levels'))
-        sm.add_widget(PracticeScreen(name='practice'))
-        sm.add_widget(MediumPracticeScreen(name='medium_practice'))
-        sm.add_widget(HardPracticeScreen(name='hard_practice'))
-        sm.add_widget(ReferenceScreen(name='reference'))
-        sm.add_widget(TranslatorScreen(name='translator'))
-        sm.add_widget(SettingsScreen(name='settings'))
+        self._load_screen(sm, 'menu')
+
         return sm
+
+    def _load_screen(self, sm, screen_name):
+        if screen_name in self._loaded_screens:
+            return True
+
+        if screen_name not in self._screen_classes:
+            print(f"Unknown screen: {screen_name}")
+            return False
+
+        screen_class = self._screen_classes[screen_name]
+        screen = screen_class(name=screen_name)
+        sm.add_widget(screen)
+        self._loaded_screens.add(screen_name)
+
+        return True
+
+    def switch_screen(self, screen_name):
+        if self.root:
+            self._load_screen(self.root, screen_name)
+            self.root.current = screen_name
+
+    def get_screen(self, screen_name):
+        if self.root:
+            self._load_screen(self.root, screen_name)
+            return self.root.get_screen(screen_name)
+        return None
+
+    def update_all_screens(self):
+        if self.root:
+            for screen_name in self._loaded_screens:
+                try:
+                    screen = self.root.get_screen(screen_name)
+                    if hasattr(screen, 'update_lang'):
+                        screen.update_lang()
+                except:
+                    pass
 
     def choose_quick_mode(self):
         modes = ['easy', 'medium', 'hard']
@@ -2880,22 +2947,24 @@ class BrailleApp(App):
             return
         mode = self.choose_quick_mode()
         if mode == 'easy':
-            scr = self.root.get_screen('practice')
+            scr = self.get_screen('practice')
             scr.quick_review_mode = True
-            self.root.current = 'practice'
+            self.switch_screen('practice')
             scr.new_question()
         elif mode == 'medium':
-            scr = self.root.get_screen('medium_practice')
+            scr = self.get_screen('medium_practice')
             scr.quick_review_mode = True
-            self.root.current = 'medium_practice'
+            self.switch_screen('medium_practice')
             scr.new_question()
         else:
-            scr = self.root.get_screen('hard_practice')
+            scr = self.get_screen('hard_practice')
             scr.quick_review_mode = True
-            self.root.current = 'hard_practice'
+            self.switch_screen('hard_practice')
             scr.new_question()
 
     def update_char_stat(self, char, is_correct):
+        if not self.use_stats:
+            return
         lang = self.current_language
         self.stats.setdefault(lang, {})
         self.stats[lang].setdefault(char, {'correct': 0, 'wrong': 0, 'last_seen': 0})
@@ -3057,14 +3126,50 @@ class BrailleApp(App):
             self.stats = {'en': {}, 'ru': {}, 'dru': {}}
 
     def save_stats(self):
+        if not self.use_stats:
+            return
         with open(self._path("stats.json"), "w", encoding="utf-8") as f:
             json.dump(self.stats, f, ensure_ascii=False, indent=2)
 
-    def update_all_screens(self):
-        if self.root and hasattr(self.root, 'screens'):
-            for screen in self.root.screens:
-                if hasattr(screen, 'update_lang'):
-                    screen.update_lang()
+    def on_start(self):
+        Window.bind(on_keyboard=self.on_back_btn)
+
+    def on_back_btn(self, window, key, *args):
+        if key == 27:
+            current = self.root.current
+
+            back_map = {
+                'lessons': 'menu',
+                'lesson_study': 'lessons',
+                'lesson_test': 'lessons',
+                'practice_levels': 'menu',
+                'practice': 'practice_levels',
+                'medium_practice': 'practice_levels',
+                'hard_practice': 'practice_levels',
+                'reference': 'menu',
+                'translator': 'menu',
+                'settings': 'menu'
+            }
+
+            if current in back_map:
+                screen = self.root.current_screen
+                if hasattr(screen, 'quick_review_mode') and screen.quick_review_mode:
+                    self.stop_quick_review()
+                    self.switch_screen('practice_levels')
+                if current == 'translator':
+                    tr = self.get_screen('translator')
+                    if tr.braille_input_active:
+                        tr.close_braille_input()
+                        return True
+                    self.switch_screen('menu')
+                else:
+                    self.switch_screen(back_map[current])
+                return True
+
+            if current == 'menu':
+                return False
+
+        return False
 
 
 if __name__ == '__main__':
