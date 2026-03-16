@@ -1,8 +1,8 @@
 from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListProperty, NumericProperty
+from kivy.uix.bubble import Bubble, BubbleContent, BubbleButton
 from kivy.uix.screenmanager import ScreenManager, Screen
 from typing import Callable, Optional, Sequence, Tuple
-from kivy.graphics import Color, RoundedRectangle
-from kivy.uix.gridlayout import GridLayout
+from kivy.core.text import Label as CoreLabel
 from kivy.core.clipboard import Clipboard
 from kivy.resources import resource_find
 from kivy.uix.boxlayout import BoxLayout
@@ -10,7 +10,6 @@ from kivy.core.text import LabelBase
 from kivy.animation import Animation
 from kivy.core.window import Window
 from kivy.uix.button import Button
-from kivy.uix.widget import Widget
 from kivy.uix.popup import Popup
 from kivy.uix.label import Label
 from kivy.utils import platform
@@ -19,6 +18,7 @@ from kivy.lang import Builder
 from kivy.clock import Clock
 from kivy.metrics import dp
 from kivy.app import App
+from functools import lru_cache
 import random
 import json
 import math
@@ -27,7 +27,8 @@ import os
 
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
-font_path = resource_find("assets/DejaVuSans.ttf") or os.path.join(os.path.dirname(__file__), "assets", "DejaVuSans.ttf")
+font_path = resource_find("assets/DejaVuSans.ttf") or os.path.join(os.path.dirname(__file__), "assets",
+                                                                   "DejaVuSans.ttf")
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
@@ -108,6 +109,62 @@ Builder.load_string('''
             size_hint_y: None
             height: dp(15)
 
+<LessonRow>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: root.row_height
+    padding: [dp(12), dp(8), dp(12), dp(8)]
+    spacing: dp(4)
+
+    canvas.before:
+        Color:
+            rgba: 0.2, 0.2, 0.2, 1
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(10)]
+
+    Label:
+        text: root.title
+        size_hint_y: None
+        height: dp(24)
+        font_size: dp(17)
+        halign: 'left'
+        valign: 'middle'
+        bold: True
+        text_size: self.width, None
+
+    Label:
+        text: root.letters_text
+        size_hint_y: None
+        height: root.letters_height
+        font_size: dp(14)
+        halign: 'left'
+        valign: 'top'
+        color: (0.75, 0.75, 0.75, 1)
+        text_size: self.width, self.height 
+
+    BoxLayout:
+        size_hint_y: None
+        height: dp(40)
+        spacing: dp(8)
+
+        Button:
+            text: root.btn_text
+            size_hint_x: 0.5
+            font_size: dp(15)
+            disabled: not root.is_unlocked
+            on_press: app.get_screen('lessons').open_lesson(root.lesson_index)
+
+        Label:
+            text: root.status_markup
+            font_name: 'BrailleFont'
+            markup: True
+            size_hint_x: 0.5
+            halign: 'right'
+            valign: 'middle'
+            font_size: dp(14)
+            text_size: self.size
 
 <LessonsScreen>:
     BoxLayout:
@@ -139,15 +196,21 @@ Builder.load_string('''
                 background_color: (1.5, 1.5, 1.5, 1) if root.current_mode == 'digits' else (1, 1, 1, 1)
                 on_press: root.switch_mode('digits')
 
-        ScrollView:
+        RecycleView:
+            id: lessons_rv
             bar_width: dp(8)
-            BoxLayout:
-                id: lessons_container
+            viewclass: 'LessonRow'
+            scroll_type: ['bars', 'content']
+            do_scroll_x: False
+
+            RecycleBoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
                 spacing: dp(8)
                 padding: [dp(10), dp(10)]
+                default_size: None, dp(110)
+                default_size_hint: 1, None
 
         BaseButton:
             text: root.back_btn
@@ -158,7 +221,7 @@ Builder.load_string('''
     BoxLayout:
         orientation: 'vertical'
         padding: dp(15)
-        spacing: dp(10)
+        spacing: dp(12)
 
         Label:
             text: root.lesson_title
@@ -168,16 +231,113 @@ Builder.load_string('''
             text_size: self.width, None
             halign: 'center'
 
-        ScrollView:
-            bar_width: dp(8)
-            GridLayout:
-                id: study_grid
-                cols: 2
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: 0.8
+
+            BoxLayout:
+                id: study_panel
+                orientation: 'vertical'
+                opacity: 1 if root.is_learning_active else 0
+                disabled: not root.is_learning_active
                 size_hint_y: None
-                height: self.minimum_height
-                spacing: dp(10)
-                padding: dp(10)
-                row_default_height: dp(80)
+                height: self.parent.height if root.is_learning_active else 0
+
+                Label:
+                    id: study_symbol
+                    text: root.current_symbol
+                    font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
+                    size_hint_y: 0.35
+                    halign: 'center'
+                    valign: 'middle'
+                    text_size: self.size
+
+                FloatLayout:
+                    size_hint_y: 0.65
+
+                    GridLayout:
+                        id: dots_grid
+                        cols: 2
+                        rows: 3
+                        spacing: [dp(20), dp(20)]
+                        padding: dp(10)
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        size_hint: None, None
+                        width: self.minimum_width
+                        height: self.minimum_height
+
+                        Button:
+                            id: d1
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(0)
+
+                        Button:
+                            id: d4
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(3)
+
+                        Button:
+                            id: d2
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(1)
+
+                        Button:
+                            id: d5
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(4)
+
+                        Button:
+                            id: d3
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(2)
+
+                        Button:
+                            id: d6
+                            text: '*'
+                            font_size: dp(24)
+                            width: dp(70)
+                            height: dp(70)
+                            size_hint: None, None
+                            on_press: root.on_dot_press(5)
+
+            ScrollView:
+                id: letters_scroll
+                bar_width: dp(8)
+                opacity: 1 if not root.is_learning_active else 0
+                scroll_y: 1.0
+                disabled: root.is_learning_active
+                size_hint_y: None
+                height: self.parent.height if not root.is_learning_active else 0
+
+                GridLayout:
+                    id: letters_grid
+                    cols: 2
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+                    padding: [dp(10), dp(5), dp(10), dp(5)]
+                    row_default_height: dp(80)
+                    valign: 'top'
 
         BoxLayout:
             size_hint_y: None
@@ -185,14 +345,10 @@ Builder.load_string('''
             spacing: dp(10)
 
             BaseButton:
-                text: root.finish_btn_text
+                id: back_finish_btn
+                text: root.back_btn if root.is_learning_active else root.finish_btn_text
                 height: dp(50)
-                on_press: root.finish_lesson()
-
-            BaseButton:
-                text: root.back_btn
-                height: dp(50)
-                on_press: app.switch_screen('lessons')
+                on_press: app.switch_screen('lessons') if root.is_learning_active else root.finish_lesson()
 
 <LessonTestScreen>:
     BoxLayout:
@@ -215,7 +371,7 @@ Builder.load_string('''
         Label:
             text: root.prompt_text
             font_name: 'BrailleFont' if root.prompt_is_braille else 'Roboto'
-            font_size: dp(80) if root.prompt_is_braille else dp(48)
+            font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
             size_hint_y: 0.35
             halign: 'center'
             valign: 'middle'
@@ -260,7 +416,7 @@ Builder.load_string('''
             Label:
                 text: root.braille_char
                 font_name: 'BrailleFont'
-                font_size: dp(80) if self.height > dp(600) else dp(50)
+                font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
                 size_hint: (0.8, 0.8)
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
         GridLayout:
@@ -293,7 +449,7 @@ Builder.load_string('''
 
         Label:
             text: root.current_letter
-            font_size: dp(48)
+            font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
             size_hint_y: 0.15
             halign: 'center'
             valign: 'middle'
@@ -316,8 +472,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(0, self)
                     background_disabled_normal: self.background_normal
@@ -327,8 +483,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(3, self)
                     background_disabled_normal: self.background_normal
@@ -338,8 +494,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(1, self)
                     background_disabled_normal: self.background_normal
@@ -349,8 +505,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(4, self)
                     background_disabled_normal: self.background_normal
@@ -360,8 +516,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(2, self)
                     background_disabled_normal: self.background_normal
@@ -371,8 +527,8 @@ Builder.load_string('''
                 Button:
                     text: '*'
                     font_size: dp(24)
-                    width: dp(60)
-                    height: dp(60)
+                    width: dp(70)
+                    height: dp(70)
                     size_hint: None, None
                     on_press: root.on_dot_press(5, self)
                     background_disabled_normal: self.background_normal
@@ -430,7 +586,7 @@ Builder.load_string('''
             Label:
                 id: word_label
                 text: root.current_word_text
-                font_size: dp(48)
+                font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
                 size_hint_y: 0.25
                 halign: 'center'
                 valign: 'middle'
@@ -683,11 +839,6 @@ Builder.load_string('''
             spacing: dp(8)
 
             BaseButton:
-                text: root.new_game_btn
-                height: dp(50)
-                on_press: root.start_new_game()
-
-            BaseButton:
                 text: root.back_btn
                 height: dp(50)
                 on_press: app.switch_screen('practice_levels')
@@ -787,6 +938,10 @@ Builder.load_string('''
                         text: root.reset_stats_btn
                         height: dp(50)
                         on_press: root.reset_stats()
+                    BaseButton:
+                        text: root.reset_lessons_btn
+                        height: dp(50)
+                        on_press: root.reset_lessons_progress()
 
                 SettingsSection:
                     SettingsHeader:
@@ -912,6 +1067,7 @@ Builder.load_string('''
                             valign: 'middle'
                         TextInput:
                             id: time_input
+                            font_name: 'BrailleFont'
                             text: str(app.quick_review_time)
                             hint_text: root.time_hint
                             input_filter: 'int'
@@ -920,6 +1076,53 @@ Builder.load_string('''
                             width: dp(150) if app.is_mobile else dp(200)
                             padding: [dp(10), (self.height - self.line_height) / 2]
                             on_text: root.update_settings('time', self.text)
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(50)
+                        spacing: dp(10)
+                        Label:
+                            text: root.quick_mode_easy_label
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                        Switch:
+                            id: quick_easy_sw
+                            active: app.quick_mode_easy
+                            size_hint_x: None
+                            width: dp(60)
+                            on_active: root.toggle_quick_easy(self.active)
+
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(50)
+                        spacing: dp(10)
+                        Label:
+                            text: root.quick_mode_medium_label
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                        Switch:
+                            id: quick_medium_sw
+                            active: app.quick_mode_medium
+                            size_hint_x: None
+                            width: dp(60)
+                            on_active: root.toggle_quick_medium(self.active)
+
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(50)
+                        spacing: dp(10)
+                        Label:
+                            text: root.quick_mode_hard_label
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                        Switch:
+                            id: quick_hard_sw
+                            active: app.quick_mode_hard
+                            size_hint_x: None
+                            width: dp(60)
+                            on_active: root.toggle_quick_hard(self.active)
 
                 SettingsSection:
                     SettingsHeader:
@@ -1064,6 +1267,7 @@ Builder.load_string('''
 
         TextInput:
             id: input_text
+            font_name: 'BrailleFont'
             hint_text: root.input_hint
             size_hint_y: None
             height: dp(120)
@@ -1364,12 +1568,11 @@ translations = {
         'streak': 'Current streak: {}\nRecord: {}', 'reference_title': 'Reference',
         'difficulty_label': 'Difficulty:', 'difficulty_2': '2 options', 'difficulty_4': '4 options',
         'difficulty_6': '6 options', 'difficulty_8': '8 options', 'difficulty_10': '10 options',
-        'translator_title': 'Translator', 'input_hint': 'Enter text here', 'translate_btn': 'Translate',
+        'translator_title': 'Translator', 'input_hint': 'Enter text here',
         'training_title': 'Training',
         'practice_levels_title': 'Practice Levels', 'easy_level': 'Easy Level', 'medium_level': 'Medium Level',
         'hard_level': 'Hard Level', 'quick_review': 'Quick Review',
         'coming_soon': 'Coming Soon!', 'time_label': 'Time per answer (sec):', 'time_hint': 'Enter time',
-        'prev': 'Previous', 'next': 'Next',
         'use_stats': 'Use Statistics', 'reset_stats_btn': 'Reset Statistics', 'reset_stats_title': 'Reset Statistics',
         'reset_stats_text': 'Are you sure you want to reset all statistics?',
         'yes': 'Yes', 'no': 'No', 'stats_label': 'Correct: {} \n Wrong: {}', "confirm_btn": "Confirm",
@@ -1379,14 +1582,14 @@ translations = {
         'quick_review_header': 'Quick Review Settings',
         'medium_mode_header': 'Medium Mode Settings',
         'mirror_mode_label': 'Mirror Writing',
-        'copy_result': 'Copy',
+        'copy': 'Copy',
         'include_letters': 'Include letters',
         'include_digits': 'Include digits',
         'section_letters': 'Letters',
         'section_digits': 'Digits',
         'Test': 'Test',
-        'lessons_title': 'Lessons', 'lesson': 'Lesson', 'letters_label': 'Letters: {}', 'start': 'Start',
-        'continue': 'Continue', 'locked': 'Locked', 'complete_lesson': 'Complete lesson',
+        'lessons_title': 'Lessons', 'lesson': 'Lesson', 'letters_label': 'Symbols: {}', 'start': 'Start',
+        'retry': 'Retry', 'locked': 'Locked', 'complete_lesson': 'Complete lesson',
         'view_all_letters': 'View all letters', 'lesson_test_title': 'Lesson Test',
         'question': 'Question {}/{}', 'test_passed': 'Test passed!', 'test_failed': 'Test failed',
         'ok': 'OK', 'completed': 'Completed', 'available': 'Available',
@@ -1397,11 +1600,16 @@ translations = {
         'you_won': 'You Won!',
         'word_search_title': 'Word Search',
         'word_search_words_title': 'Find words:',
-        'word_search_new_game': 'New Game',
         'word_search_status': 'Found: {}/{}',
         'word_search_win_text': 'All words found.',
         'games': 'Games',
-
+        'review': 'Review',
+        'reset_lessons_btn': 'Reset Lessons Progress',
+        'reset_lessons_title': 'Reset Lessons Progress',
+        'reset_lessons_text': 'Are you sure you want to reset lessons progress and stars?',
+        'cut_popup': 'Cut',
+        'paste_popup': 'Paste',
+        'select_all_popup': 'Select All',
     },
     'ru': {
         'menu_title': 'Главное меню', 'practice': 'Практика',
@@ -1409,12 +1617,11 @@ translations = {
         'streak': 'Текущая серия: {}\nРекорд: {}', 'reference_title': 'Справочник',
         'difficulty_label': 'Сложность:', 'difficulty_2': '2 варианта', 'difficulty_4': '4 варианта',
         'difficulty_6': '6 вариантов', 'difficulty_8': '8 вариантов', 'difficulty_10': '10 вариантов',
-        'translator_title': 'Переводчик', 'input_hint': 'Введите текст', 'translate_btn': 'Перевести',
+        'translator_title': 'Переводчик', 'input_hint': 'Введите текст',
         'training_title': 'Обучение',
         'practice_levels_title': 'Уровни практики', 'easy_level': 'Простой уровень', 'medium_level': 'Средний уровень',
         'hard_level': 'Сложный уровень', 'quick_review': 'Быстрое повторение',
         'coming_soon': 'Скоро будет!', 'time_label': 'Время на ответ (сек):', 'time_hint': 'Введите время',
-        'prev': 'Предыдущий', 'next': 'Следующий',
         'use_stats': 'Использовать статистику', 'reset_stats_btn': 'Сбросить статистику',
         'reset_stats_title': 'Сброс статистики', 'reset_stats_text': 'Вы уверены, что хотите сбросить всю статистику?',
         'yes': 'Да', 'no': 'Нет', 'stats_label': 'Правильно: {} \n Ошибок: {}', "confirm_btn": "Подтвердить",
@@ -1425,14 +1632,13 @@ translations = {
         'quick_review_header': 'Настройки быстрого повторения',
         'medium_mode_header': 'Настройки среднего режима',
         'mirror_mode_label': 'Зеркальное письмо',
-        'copy_result': 'Копировать',
         'include_letters': 'Включать буквы',
         'include_digits': 'Включать цифры',
         'section_letters': 'Буквы',
         'section_digits': 'Цифры',
         'Test': 'Зачёт',
-        'lessons_title': 'Уроки', 'lesson': 'Урок', 'letters_label': 'Буквы: {}', 'start': 'Начать',
-        'continue': 'Продолжить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урок',
+        'lessons_title': 'Уроки', 'lesson': 'Урок', 'letters_label': 'Символы: {}', 'start': 'Начать',
+        'retry': 'Повторить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урок',
         'view_all_letters': 'Просмотрите все буквы', 'lesson_test_title': 'Тест по уроку',
         'question': 'Вопрос {}/{}', 'test_passed': 'Тест пройден!', 'test_failed': 'Тест не пройден',
         'ok': 'Ок', 'completed': 'Пройдено', 'available': 'Доступно',
@@ -1443,10 +1649,17 @@ translations = {
         'you_won': 'Победа!',
         'word_search_title': 'Филворд',
         'word_search_words_title': 'Найди слова:',
-        'word_search_new_game': 'Новая игра',
         'word_search_status': 'Найдено: {}/{}',
         'word_search_win_text': 'Все слова найдены.',
         'games': 'Игры',
+        'review': 'Повторение',
+        'reset_lessons_btn': 'Сбросить прогресс обучения',
+        'reset_lessons_title': 'Сброс прогресса обучения',
+        'reset_lessons_text': 'Вы уверены, что хотите сбросить прогресс уроков и звёзды?',
+        'copy': 'Копировать',
+        'cut_popup': 'Вырезать',
+        'paste_popup': 'Вставить',
+        'select_all_popup': 'Выбрать всё',
     },
     'dru': {
         'menu_title': 'Главное меню', 'practice': 'Практика',
@@ -1454,29 +1667,29 @@ translations = {
         'streak': 'Текущая серія: {}\nРекордъ: {}', 'reference_title': 'Справочникъ',
         'difficulty_label': 'Сложность:', 'difficulty_2': '2 варіанта', 'difficulty_4': '4 варіанта',
         'difficulty_6': '6 варіантовъ', 'difficulty_8': '8 варіантовъ', 'difficulty_10': '10 варіантовъ',
-        'translator_title': 'Переводчикъ', 'input_hint': 'Введите текстъ', 'translate_btn': 'Перевести',
+        'translator_title': 'Переводчикъ', 'input_hint': 'Введите текстъ',
         'training_title': 'Обученіе',
         'practice_levels_title': 'Уровни практики', 'easy_level': 'Простой уровень', 'medium_level': 'Средній уровень',
         'hard_level': 'Сложный уровень', 'quick_review': 'Быстрое повтореніе',
         'coming_soon': 'Скоро будетъ!', 'time_label': 'Время на отвѣтъ (сѣкъ):', 'time_hint': 'Введите время',
-        'prev': 'Предыдущій', 'next': 'Слѣдующій',
         'use_stats': 'Использовать статистику', 'reset_stats_btn': 'Сбросить статистику',
         'reset_stats_title': 'Сбросъ статистики', 'reset_stats_text': 'Вы увѣрены, что хотите сбросить всю статистику?',
         'yes': 'Да', 'no': 'Нѣтъ', 'stats_label': 'Правильно: {} \n Ошибокъ: {}', "confirm_btn": "Подтвердить",
         "hint_btn": "Подсказка", 'input_braille_btn': 'Вводъ Брайля', 'delete_btn': 'Удалить',
-        'no_errors_btn': 'Ошибокъ нѣтъ', 'general_settings_header': 'Общіе настройки',
+        'no_errors_btn': 'Ошибокъ нѣтъ',
+        'general_settings_header': 'Общіе настройки',
         'easy_mode_header': 'Настройки простого режима',
         'quick_review_header': 'Настройки быстраго повторенія',
         'medium_mode_header': 'Настройки средняго режима',
         'mirror_mode_label': 'Зеркальное письмо',
-        'copy_result': 'Копировать',
+        'copy': 'Копировать',
         'include_letters': 'Включать буквы',
         'include_digits': 'Включать цифры',
         'section_letters': 'Буквы',
         'section_digits': 'Цифры',
         'Test': 'Зачетъ',
-        'lessons_title': 'Уроки', 'lesson': 'Урокъ', 'letters_label': 'Буквы: {}', 'start': 'Начать',
-        'continue': 'Продолжить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урокъ',
+        'lessons_title': 'Уроки', 'lesson': 'Урокъ', 'letters_label': 'Символы: {}', 'start': 'Начать',
+        'retry': 'Повторить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урокъ',
         'view_all_letters': 'Просмотрите всё буквы', 'lesson_test_title': 'Тестъ по уроку',
         'question': 'Вопросъ {}/{}', 'test_passed': 'Тестъ пройденъ!', 'test_failed': 'Тестъ не пройденъ',
         'ok': 'Окъ', 'completed': 'Пройдено', 'available': 'Доступно',
@@ -1487,14 +1700,78 @@ translations = {
         'you_won': 'Побѣда!',
         'word_search_title': 'Филвордъ',
         'word_search_words_title': 'Найди слова:',
-        'word_search_new_game': 'Новая игра',
         'word_search_status': 'Найдено: {}/{}',
-        'word_search_win_text': 'Всѣ слова найдены.',
+        'word_search_win_text': 'Всё слова найдены.',
         'games': 'Игры',
+        'review': 'Повтореніе',
+        'reset_lessons_btn': 'Сбросить прогрессъ обученія',
+        'reset_lessons_title': 'Сбросъ прогресса обученія',
+        'reset_lessons_text': 'Вы увѣрены, что хотите сбросить прогрессъ уроковъ и звѣзды?',
+        'cut_popup': 'Вырѣзать',
+        'paste_popup': 'Вставить',
+        'select_all_popup': 'Выбрать всё',
     }
 }
 
 LANGUAGES = {'en': 'English', 'ru': 'Русский', 'dru': 'Дореволюціонный русскій'}
+
+
+# _original_bubble_button_init = BubbleButton.__init__
+#
+#
+# def _update_bubble_text(instance, value):
+#     defaults = {
+#         'Copy': 'copy_popup',
+#         'Cut': 'cut_popup',
+#         'Paste': 'paste_popup',
+#         'Select All': 'select_all_popup'
+#     }
+#
+#     if value in defaults:
+#         app = App.get_running_app()
+#         if not app: return
+#         lang = getattr(app, 'current_language', 'en')
+#
+#         if 'translations' in globals():
+#             tr_data = globals()['translations']
+#             t_dict = tr_data.get(lang, tr_data['en'])
+#             key = defaults[value]
+#             if key in t_dict and t_dict[key] != value:
+#                 instance.text = t_dict[key]
+#
+#
+# def _update_bubble_width_tree(instance, size):
+#     new_btn_width = size[0] + dp(40)
+#
+#     if instance.width != new_btn_width:
+#         instance.width = new_btn_width
+#
+#     content = instance.parent
+#     if content and isinstance(content, BubbleContent):
+#         content.size_hint_x = None
+#         content.width = content.minimum_width
+#
+#         bubble = content.parent
+#         if bubble and isinstance(bubble, Bubble):
+#             bubble.size_hint_x = None
+#             bubble.width = content.width + dp(32)
+#
+#
+# def _localized_bubble_button_init(self, **kwargs):
+#     _original_bubble_button_init(self, **kwargs)
+#
+#     if self.text:
+#         _update_bubble_text(self, self.text)
+#     self.bind(text=_update_bubble_text)
+#
+#     self.size_hint_x = None
+#
+#     self.bind(texture_size=_update_bubble_width_tree)
+#
+#     if self.texture_size:
+#         Clock.schedule_once(lambda dt: _update_bubble_width_tree(self, self.texture_size), 0)
+#
+# BubbleButton.__init__ = _localized_bubble_button_init
 
 
 class BaseScreen(Screen):
@@ -1523,13 +1800,29 @@ class BaseScreen(Screen):
         self.braille_data = self.app.braille_data[self.app.current_language]
 
     def animate_correct(self, widget):
-        Animation(opacity=0.6, duration=0.06) + Animation(opacity=1, duration=0.10)
+        Animation.cancel_all(widget, "font_size", "background_color")
+
+        original_size = float(widget.font_size)
+
+        anim = (
+                Animation(font_size=original_size * 1.6, duration=0.15, t="out_back")
+                + Animation(font_size=original_size, duration=0.10, t="out_quad")
+        )
+        anim.start(widget)
 
     def animate_wrong(self, widget):
-        anim = Animation(x=widget.x - dp(10), duration=0.05) + \
-               Animation(x=widget.x + dp(20), duration=0.08) + \
-               Animation(x=widget.x - dp(15), duration=0.06) + \
-               Animation(x=widget.x, duration=0.05)
+        Animation.cancel_all(widget, "x")
+
+        x0 = widget.x
+        d = dp(10)
+
+        anim = (
+                Animation(x=x0 - d, duration=0.04)
+                + Animation(x=x0 + d, duration=0.04)
+                + Animation(x=x0 - d * 0.6, duration=0.04)
+                + Animation(x=x0 + d * 0.6, duration=0.04)
+                + Animation(x=x0, duration=0.05)
+        )
         anim.start(widget)
 
     def get_braille_char(self, dots):
@@ -1542,7 +1835,8 @@ class BaseScreen(Screen):
         if dots[5]: code |= 0x20
         return chr(code)
 
-    def update_streak_text(self,  score_key: str, local_streak_attr: str = "current_streak", streak_prop: str = "streak_text",) -> None:
+    def update_streak_text(self, score_key, local_streak_attr = "current_streak",
+                           streak_prop = "streak_text", ):
         lang = self.app.current_language
 
         is_quick = bool(getattr(self, "quick_review_mode", False))
@@ -1614,17 +1908,19 @@ class BaseScreen(Screen):
         return items[-1]
 
     def on_leave(self, *args):
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
+        self.stop_timer()
+        self.cancel_all_events()
+        self.timer_active = False
+
+    def cancel_all_events(self):
         for event in self.scheduled_events:
             event.cancel()
         self.scheduled_events.clear()
-        self.timer_active = False
 
-    def show_popup( self, title: str, text: str = "", *, size=(dp(320), dp(240)), auto_dismiss: bool = False,
-        buttons: Sequence[Tuple[str, Optional[Callable[[], None]]]] = (), font_size=dp(20),
-        padding=dp(20), spacing=dp(12), buttons_height=dp(50), buttons_spacing=dp(10),  text_width: Optional[float] = None) -> Popup:
+    def show_popup(self, title, text = "", *, size=(dp(320), dp(240)), auto_dismiss = False,
+                   buttons = (), font_size=dp(20),
+                   padding=dp(20), spacing=dp(12), buttons_height=dp(50), buttons_spacing=dp(10),
+                   text_width = None):
 
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
 
@@ -1633,11 +1929,13 @@ class BaseScreen(Screen):
             font_size=font_size,
             halign="center",
             valign="middle",
-            size_hint_y=1)
+            size_hint_y=1,
+            markup=True, )
 
         def _sync(*_):
             w = lbl.width if text_width is None else text_width
             lbl.text_size = (w, None)
+
         lbl.bind(size=_sync, text=_sync)
         _sync()
 
@@ -1648,7 +1946,7 @@ class BaseScreen(Screen):
             content=root,
             size_hint=(None, None),
             size=size,
-            auto_dismiss=auto_dismiss,)
+            auto_dismiss=auto_dismiss, )
 
         if buttons:
             row = BoxLayout(size_hint_y=None, height=buttons_height, spacing=buttons_spacing)
@@ -1658,6 +1956,7 @@ class BaseScreen(Screen):
                     popup.dismiss()
                     if cb:
                         cb()
+
                 return _
 
             for caption, cb in buttons:
@@ -1673,7 +1972,8 @@ class BaseScreen(Screen):
     def disable_children(self, widget):
         for ch in widget.children:
             ch.disabled = True
-            ch.disabled_color = (1, 1, 1, 1)
+            if hasattr(ch, "disabled_color"):
+                ch.disabled_color = (1, 1, 1, 1)
 
     def show_win_popup(self, text, on_again):
         return self.show_popup(
@@ -1695,6 +1995,66 @@ class BaseScreen(Screen):
         event = Clock.schedule_once(callback, delay)
         self.scheduled_events.append(event)
         return event
+
+    def stars_str(self, stars, max_stars = 5):
+        stars = max(0, min(int(stars), int(max_stars)))
+        return "★" * stars + "☆" * (max_stars - stars)
+
+    def dots_for_symbol(self, sym):
+        if sym in digits_data:
+            return digits_data[sym]
+        return self.app.braille_data[self.app.current_language][sym]
+
+    def hamming(self, a, b):
+        return sum(1 for ai, bi in zip(a, b) if ai != bi)
+
+    def build_answers_hamming(self, correct_sym, pool, k):
+
+        if k <= 1:
+            return [correct_sym]
+
+        try:
+            correct_dots = self.dots_for_symbol(correct_sym)
+        except KeyError:
+            answers = [correct_sym] + [p for p in pool if p != correct_sym]
+            random.shuffle(answers)
+            return answers[:k]
+
+        candidates = []
+        for s in pool:
+            if s == correct_sym:
+                continue
+            try:
+                d = self.dots_for_symbol(s)
+            except KeyError:
+                continue
+            dist = self.hamming(correct_dots, d)
+            candidates.append((dist, s))
+
+        candidates.sort(key=lambda x: x[0])
+
+        answers = [correct_sym]
+        need = k - 1
+
+        need_close = min(len(candidates), int(round(need * 0.7)))
+        need_rand = need - need_close
+
+        close = [s for _, s in candidates[:max(10, k * 3)]]
+        random.shuffle(close)
+        answers.extend(close[:need_close])
+
+        remaining = [s for _, s in candidates if s not in answers]
+        random.shuffle(remaining)
+        answers.extend(remaining[:need_rand])
+
+        if len(answers) < k:
+            extra = [s for s in pool if s not in answers]
+            random.shuffle(extra)
+            answers.extend(extra[:(k - len(answers))])
+
+        answers = answers[:k]
+        random.shuffle(answers)
+        return answers
 
 
 class MenuScreen(BaseScreen):
@@ -1728,6 +2088,59 @@ class MenuScreen(BaseScreen):
         self.settings_title = self.get_translation('settings_title')
 
 
+class LessonRow(BoxLayout):
+    lesson_index = NumericProperty(0)
+    title = StringProperty('')
+    letters_text = StringProperty('')
+    btn_text = StringProperty('')
+    status_markup = StringProperty('')
+    is_unlocked = BooleanProperty(True)
+
+    _height_cache = {}
+
+    row_height = NumericProperty(dp(110))
+    letters_height = NumericProperty(dp(20))
+
+    _pad_y = dp(8) * 2
+    _spacing_y = dp(4) * 2
+    _title_h = dp(24)
+    _buttons_h = dp(40)
+    _min_letters_h = dp(20)
+
+    def on_kv_post(self, base_widget):
+        self.bind(width=self._trigger_recalc)
+        self.bind(letters_text=self._trigger_recalc)
+        Clock.schedule_once(lambda dt: self._recalc_heights(), 0)
+
+    def _trigger_recalc(self, *args):
+        Clock.schedule_once(lambda dt: self._recalc_heights(), 0)
+
+    def _recalc_heights(self):
+        wrap_w = max(1, self.width - dp(12) * 2)
+        fs = int(dp(14))
+        key = (int(wrap_w), self.letters_text, fs)
+
+        cached = self._height_cache.get(key)
+        if cached:
+            letters_h, row_h = cached
+            if self.letters_height != letters_h:
+                self.letters_height = letters_h
+            if self.row_height != row_h:
+                self.row_height = row_h
+            return
+
+        cl = CoreLabel(text=self.letters_text, font_size=dp(14))
+        cl.text_size = (wrap_w, None)
+        cl.refresh()
+
+        letters_h = max(self._min_letters_h, cl.texture.size[1])
+        row_h = self._pad_y + self._spacing_y + self._title_h + letters_h + self._buttons_h
+
+        self._height_cache[key] = (letters_h, row_h)
+        self.letters_height = letters_h
+        self.row_height = row_h
+
+
 class LessonsScreen(BaseScreen):
     lessons_title = StringProperty()
     current_mode = StringProperty('letters')
@@ -1746,13 +2159,11 @@ class LessonsScreen(BaseScreen):
 
     def on_pre_enter(self, *args):
         self.update_lang()
-        self.refresh_lessons(force=False)
-        self.start_pulse_animation()
+        self.refresh_lessons(force=True)
 
     def switch_mode(self, mode):
         self.current_mode = mode
         self.refresh_lessons(force=True)
-        self.start_pulse_animation()
 
     def _progress_completed(self):
         app = self.app
@@ -1774,120 +2185,60 @@ class LessonsScreen(BaseScreen):
         self._built_key = key
         self.populate_lessons()
 
-    def start_pulse_animation(self):
-        if hasattr(self, '_pulse_anim'):
-            self._pulse_anim.cancel_all(self)
-
-        container = self.ids.lessons_container
-        target_btn = None
-
-        for row in container.children:
-            for child in row.children:
-                if isinstance(child, BoxLayout):
-                    btn = child.children[1]
-                    if not btn.disabled and btn.text == self.get_translation('start'):
-                        target_btn = btn
-                        break
-
-        if target_btn:
-            self._pulse_anim = Animation(opacity=0.2, duration=0.5, t='in_out_quad') + \
-                               Animation(opacity=1.2, duration=0.5, t='in_out_quad')
-            self._pulse_anim.repeat = True
-            self._pulse_anim.start(target_btn)
-
     def populate_lessons(self):
-        container = self.ids.lessons_container
-        container.clear_widgets()
         app = self.app
         lang = app.current_language
-
         lessons = app.get_lessons(lang, self.current_mode)
-        completed = self._progress_completed()
+        data = []
+        is_previous_completed = True
 
-        for idx, lesson in enumerate(lessons, start=1):
-            is_completed = idx <= completed
-            is_unlocked = idx <= completed + 1
-
-            row = BoxLayout(orientation='vertical', size_hint_y=None,
-                            padding=[dp(12), dp(8)], spacing=dp(4))
-
-            with row.canvas.before:
-                Color(0.2, 0.2, 0.2, 1)
-                row.rect = RoundedRectangle(pos=row.pos, size=row.size, radius=[dp(10)])
-
-            row.bind(pos=lambda inst, val: setattr(inst.rect, 'pos', val),
-                     size=lambda inst, val: setattr(inst.rect, 'size', val))
-
-            row.bind(minimum_height=row.setter('height'))
+        for idx, lesson in enumerate(lessons):
+            stars = app.get_lesson_stars(lang, idx, self.current_mode)
+            is_unlocked = is_previous_completed
+            is_previous_completed = (stars > 0)
 
             mode = lesson['mode']
+
             if mode == 'study':
                 mode_title = self.get_translation('training_title')
             elif mode == 'practice':
                 mode_title = self.get_translation('practice')
+            elif mode == 'review':
+                mode_title = self.get_translation('review')
             else:
                 mode_title = self.get_translation('Test')
 
-            title = f"{self.get_translation('lesson')} {idx}: {mode_title}"
-
-            title_label = Label(
-                text=title,
-                size_hint_y=None,
-                height=dp(26),
-                font_size=dp(17),
-                halign='left',
-                valign='middle',
-                bold=True
-            )
-            title_label.bind(width=lambda inst, w: setattr(inst, 'text_size', (w, None)))
-            title_label.bind(texture_size=lambda inst, ts: setattr(inst, 'height', max(dp(26), ts[1])))
-            row.add_widget(title_label)
-
+            title = f"{self.get_translation('lesson')} {idx + 1}: {mode_title}"
             letters_text = self.get_translation('letters_label').format(' '.join(lesson['letters']))
-            letters_label = Label(
-                text=letters_text,
-                size_hint_y=None,
-                height=dp(20),
-                font_size=dp(14),
-                halign='left',
-                valign='top',
-                color=(0.75, 0.75, 0.75, 1)
-            )
-            letters_label.bind(width=lambda inst, w: setattr(inst, 'text_size', (w, None)))
-            letters_label.bind(texture_size=lambda inst, ts: setattr(inst, 'height', max(dp(20), ts[1])))
-            row.add_widget(letters_label)
 
-            btn_box = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+            if stars > 0:
+                if mode == 'study':
+                    status_text = f"[color=33aa33]{self.get_translation('completed')}[/color]"
+                    btn_text = self.get_translation('retry')
+                else:
+                    filled_star = "[color=FFD700]★[/color]"
+                    empty_star = "[color=555555]★[/color]"
+                    stars_visual = (filled_star * stars) + (empty_star * (5 - stars))
+                    status_text = f"[font=BrailleFont]{stars_visual}[/font]"
+                    btn_text = self.get_translation('retry')
 
-            btn = Button(
-                text=self.get_translation('continue') if is_completed else self.get_translation('start'),
-                size_hint_x=0.5,
-                font_size=dp(15)
-            )
-            btn.disabled = not is_unlocked
-            btn.bind(on_press=lambda inst, i=idx - 1: self.open_lesson(i))
-            btn_box.add_widget(btn)
-
-            if is_completed:
-                status_text = f"[color=33aa33]{self.get_translation('completed')}[/color]"
             elif is_unlocked:
                 status_text = f"[color=3333aa]{self.get_translation('available')}[/color]"
+                btn_text = self.get_translation('start')
             else:
                 status_text = f"[color=aa3333]{self.get_translation('locked')}[/color]"
+                btn_text = self.get_translation('start')
 
-            status_label = Label(
-                text=status_text,
-                markup=True,
-                size_hint_x=0.5,
-                halign='right',
-                valign='middle',
-                font_size=dp(14)
-            )
-            status_label.bind(size=status_label.setter('text_size'))
+            data.append({
+                "lesson_index": idx,
+                "title": title,
+                "letters_text": letters_text,
+                "btn_text": btn_text,
+                "status_markup": status_text,
+                "is_unlocked": is_unlocked,
+            })
 
-            btn_box.add_widget(status_label)
-            row.add_widget(btn_box)
-            container.add_widget(row)
+        self.ids.lessons_rv.data = data
 
     def open_lesson(self, lesson_index):
         app = self.app
@@ -1901,45 +2252,166 @@ class LessonsScreen(BaseScreen):
         else:
             scr = app.get_screen('lesson_test')
             is_exam = lesson.get('mode') == 'exam'
-            scr.set_lesson(lesson_index, lesson['letters'], is_final_exam=is_exam, lesson_type=self.current_mode)
+            scr.set_lesson(
+                lesson_index,
+                lesson['letters'],
+                lesson_mode=lesson.get('mode', 'practice'),
+                is_final_exam=is_exam,
+                lesson_type=self.current_mode
+            )
             app.switch_screen('lesson_test')
-
-    def on_leave(self, *args):
-        if hasattr(self, '_pulse_anim'):
-            self._pulse_anim.cancel_all(self)
 
 
 class LessonStudyScreen(BaseScreen):
     lesson_title = StringProperty()
     finish_btn_text = StringProperty()
+    current_symbol = StringProperty('')
+    is_learning_active = BooleanProperty(True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.lesson_index = 0
         self.letters = []
         self.lesson_type = 'letters'
+        self._i = 0
+        self._target_dots = [0] * 6
+        self._pressed = [0] * 6
+        self._dot_btns = []
+        self._pulse_anims = {}
+        self._locked = False
+        self._letters_table_widgets = []
 
     def update_lang(self):
         super().update_lang()
         self.finish_btn_text = self.get_translation('complete_lesson')
 
+    def on_pre_enter(self, *args):
+        super().on_pre_enter(*args)
+
     def set_lesson(self, lesson_index, letters, lesson_type='letters'):
         self.lesson_index = lesson_index
         self.letters = letters[:]
         self.lesson_type = lesson_type
+        self.is_learning_active = True
+
         self.update_lang()
         mode_title = self.get_translation('training_title')
         self.lesson_title = f"{self.get_translation('lesson')} {lesson_index + 1}: {mode_title}"
-        self._populate_grid()
 
-    def _populate_grid(self):
-        grid = self.ids.study_grid
-        grid.clear_widgets()
+        self._i = 0
+        Clock.schedule_once(lambda dt: self._show_current(), 0)
+
+    def _dots_for_symbol(self, sym):
+        if self.lesson_type == 'digits':
+            return digits_data[sym]
+        return self.app.braille_data[self.app.current_language][sym]
+
+    def _reset_buttons_visual(self):
+        for b in self._dot_btns:
+            b.background_color = (1, 1, 1, 1)
+            b.disabled = False
+            b.disabled_color = (1, 1, 1, 1)
+
+    def _stop_all_pulses(self):
+        for btn in self._dot_btns:
+            Animation.cancel_all(btn, "background_color")
+            Animation.cancel_all(btn, "x")
+            if hasattr(btn, "_is_animating"):
+                btn._is_animating = False
+        self._pulse_anims.clear()
+
+    def _start_pulses_for_targets(self):
+        for idx, need in enumerate(self._target_dots):
+            if not need:
+                continue
+            btn = self._dot_btns[idx]
+            Animation.cancel_all(btn, "background_color")
+            btn.background_color = (0.7, 0.9, 1.0, 1)
+
+            anim = (
+                    Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
+                    + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+            )
+            anim.repeat = True
+            anim.start(btn)
+            self._pulse_anims[idx] = anim
+
+    def _ensure_dot_buttons(self):
+        if len(self._dot_btns) == 6:
+            return True
+        if not self.ids:
+            return False
+        try:
+            self._dot_btns = [self.ids.d1, self.ids.d2, self.ids.d3, self.ids.d4, self.ids.d5, self.ids.d6]
+            return True
+        except Exception:
+            return False
+
+    def _show_current(self):
+        if not self._ensure_dot_buttons():
+            Clock.schedule_once(lambda dt: self._show_current(), 0)
+            return
+
+        if self._i >= len(self.letters):
+            self.is_learning_active = False
+            self.current_symbol = ""
+            self._stop_all_pulses()
+            self._locked = True
+            for b in self._dot_btns:
+                b.disabled = True
+            self._show_letters_table()
+            return
+
+        self._locked = False
+        self.current_symbol = self.letters[self._i]
+        self._target_dots = self._dots_for_symbol(self.current_symbol)
+        self._pressed = [0] * 6
+
+        self._stop_all_pulses()
+        self._reset_buttons_visual()
+        self._start_pulses_for_targets()
+
+        lbl = self.ids.study_symbol
+        Animation.cancel_all(lbl, "opacity")
+        lbl.opacity = 0
+        Animation(opacity=1, duration=0.25).start(lbl)
+
+    def _show_letters_table(self):
+        grid = self.ids.letters_grid
+
+        need_pairs = len(self.letters)
+
+        while len(self._letters_table_widgets) < need_pairs:
+            letter_label = Label(
+                text="",
+                font_size=dp(58),
+                halign='center',
+                valign='middle',
+                size_hint_y=None,
+                height=dp(80)
+            )
+            braille_label = Label(
+                text="",
+                font_name='BrailleFont',
+                font_size=dp(62),
+                halign='center',
+                valign='middle',
+                size_hint_y=None,
+                height=dp(80)
+            )
+            self._letters_table_widgets.append((letter_label, braille_label))
+
+        if len(grid.children) != need_pairs * 2:
+            grid.clear_widgets()
+            for i in range(need_pairs):
+                ll, bl = self._letters_table_widgets[i]
+                grid.add_widget(ll)
+                grid.add_widget(bl)
 
         is_digits = (self.lesson_type == 'digits')
         ns = self.get_braille_char(number_sign_dots)
 
-        for char in self.letters:
+        for i, char in enumerate(self.letters):
             if is_digits:
                 dots = digits_data[char]
                 braille_char = ns + self.get_braille_char(dots)
@@ -1947,15 +2419,142 @@ class LessonStudyScreen(BaseScreen):
                 dots = self.app.braille_data[self.app.current_language][char]
                 braille_char = self.get_braille_char(dots)
 
-            letter_label = Label(text=char, font_size=dp(48))
-            braille_label = Label(text=braille_char, font_name='BrailleFont', font_size=dp(52))
+            ll, bl = self._letters_table_widgets[i]
+            ll.text = char
+            bl.text = braille_char
 
-            grid.add_widget(letter_label)
-            grid.add_widget(braille_label)
+        grid.height = grid.minimum_height
+
+        scroll_view = self.ids.letters_scroll
+        scroll_view.opacity = 0
+        scroll_view.disabled = True
+        scroll_view.scroll_y = 1.0
+
+        study_panel = self.ids.study_panel
+        Animation(opacity=0, duration=0.2).start(study_panel)
+
+        def show_table(dt):
+            Animation(opacity=1, duration=0.3).start(scroll_view)
+            scroll_view.disabled = False
+            scroll_view.scroll_y = 1.0
+
+        Clock.schedule_once(show_table, 0.2)
+
+    def on_dot_press(self, dot_index: int):
+        if not self._ensure_dot_buttons():
+            return
+        if self._locked or not self.current_symbol or not self.is_learning_active:
+            return
+
+        btn = self._dot_btns[dot_index]
+
+        if getattr(btn, '_is_animating', False):
+            return
+
+        need = bool(self._target_dots[dot_index])
+
+        if not need:
+            btn._is_animating = True
+
+            Animation.cancel_all(btn, "background_color")
+            Animation.cancel_all(btn, "x")
+
+            btn.background_color = (1, 0.4, 0.4, 1)
+
+            original_x = btn.x
+            anim = Animation(x=original_x - dp(10), duration=0.05) + Animation(x=original_x + dp(10),
+                                                                               duration=0.1) + Animation(x=original_x,
+                                                                                                         duration=0.05)
+
+            def on_anim_complete(*args):
+                btn._is_animating = False
+                self._restore_dot_color(dot_index)
+
+            anim.bind(on_complete=on_anim_complete)
+            anim.start(btn)
+            return
+
+        if self._pressed[dot_index]:
+            return
+
+        self._pressed[dot_index] = 1
+
+        if dot_index in self._pulse_anims:
+            Animation.cancel_all(btn, "background_color")
+            del self._pulse_anims[dot_index]
+
+        btn.background_color = (0.2, 0.85, 0.2, 1)
+        self.animate_correct(btn)
+
+        if self._is_completed():
+            self._go_next()
+
+    def _restore_dot_color(self, dot_index: int):
+        if self._locked or not self.is_learning_active:
+            return
+
+        if dot_index >= len(self._dot_btns):
+            return
+
+        btn = self._dot_btns[dot_index]
+
+        if getattr(btn, '_is_animating', False):
+            Clock.schedule_once(lambda dt: self._restore_dot_color(dot_index), 0.05)
+            return
+
+        Animation.cancel_all(btn, "background_color")
+
+        if self._target_dots[dot_index] and not self._pressed[dot_index]:
+            btn.background_color = (0.7, 0.9, 1.0, 1)
+            anim = (
+                    Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
+                    + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+            )
+            anim.repeat = True
+            anim.start(btn)
+            self._pulse_anims[dot_index] = anim
+        else:
+            btn.background_color = (1, 1, 1, 1)
+
+    def _is_completed(self):
+        for i in range(6):
+            if self._target_dots[i] and not self._pressed[i]:
+                return False
+        return True
+
+    def _go_next(self):
+        self._locked = True
+        self._stop_all_pulses()
+
+        lbl = self.ids.study_symbol
+        anim = Animation(opacity=0, duration=0.18)
+
+        def _after(*_):
+            self._i += 1
+            self._locked = False
+            self._show_current()
+
+        anim.bind(on_complete=lambda *a: self.schedule_once(lambda dt: _after(), 0.05))
+        anim.start(lbl)
 
     def finish_lesson(self):
-        self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type)
+        if self.is_learning_active:
+            return
+
+        self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type, 5)
         self.app.switch_screen('lessons')
+
+    def on_kv_post(self, base_widget):
+        self._dot_btns = [self.ids.d1, self.ids.d2, self.ids.d3, self.ids.d4, self.ids.d5, self.ids.d6]
+        for b in self._dot_btns:
+            b._is_animating = False
+            b._restore_token = 0
+            b._x0 = b.x
+
+    def on_leave(self, *args):
+        super().on_leave(*args)
+        self._stop_all_pulses()
+        self._locked = True
 
 
 class LessonTestScreen(BaseScreen):
@@ -1977,12 +2576,8 @@ class LessonTestScreen(BaseScreen):
         self.scheduled_events = []
         self.lesson_type = 'letters'
 
-    def schedule_once(self, func, delay):
-        ev = Clock.schedule_once(func, delay)
-        self.scheduled_events.append(ev)
-        return ev
-
     def on_leave(self, *args):
+        super().on_leave(*args)
         for ev in self.scheduled_events:
             ev.cancel()
         self.scheduled_events.clear()
@@ -1991,19 +2586,27 @@ class LessonTestScreen(BaseScreen):
         super().update_lang()
         self.test_title = self.get_translation('lesson_test_title')
 
-    def set_lesson(self, lesson_index, letters, is_final_exam=False, lesson_type='letters'):
+    def set_lesson(self, lesson_index, letters, *, lesson_mode='practice', is_final_exam=False, lesson_type='letters'):
         self.lesson_index = lesson_index
         self.letters = letters[:]
         self.lesson_type = lesson_type
+        self.lesson_mode = lesson_mode
 
-        if is_final_exam:
+        if is_final_exam or lesson_mode == "exam":
             self.questions_total = len(self.letters) * 3
             self.question_list = self.letters * 3
+
+        elif lesson_mode == "review":
+            self.question_list = self.letters[:]
+            random.shuffle(self.question_list)
+            self.questions_total = len(self.question_list)
+
         else:
             self.questions_total = max(8, len(self.letters) * 2)
             self.question_list = self.letters * 2
             while len(self.question_list) < self.questions_total:
                 self.question_list.append(random.choice(self.letters))
+            random.shuffle(self.question_list)
 
         random.shuffle(self.question_list)
 
@@ -2083,6 +2686,7 @@ class LessonTestScreen(BaseScreen):
             instance.background_color = (0, 1, 0, 1)
             self.correct += 1
             self.app.update_char_stat(correct_char, True)
+            self.animate_correct(instance)
         else:
             instance.background_color = (1, 0, 0, 1)
             self.animate_wrong(instance)
@@ -2093,23 +2697,67 @@ class LessonTestScreen(BaseScreen):
         self.schedule_once(self.next_question, 0.8)
 
     def finish_test(self):
-        required_ratio = 0.9
-        passed = self.correct >= math.ceil(required_ratio * self.questions_total)
+        max_stars = getattr(self.app, "LESSON_STARS_MAX", 5)
+        ratio = (self.correct / self.questions_total) if self.questions_total else 0.0
 
-        if passed:
-            self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type)
+        stars = int(math.floor(ratio * max_stars + 1e-9))
+        stars = max(0, min(stars, max_stars))
 
-        title = self.get_translation('test_passed') if passed else self.get_translation('test_failed')
-        percent = int(self.correct / self.questions_total * 100)
-        msg = f"{self.correct}/{self.questions_total} ({percent}%)"
+        if stars >= 1:
+            self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type, stars=stars)
+
+        percent = int(ratio * 100)
+        stars_line = f"[font=BrailleFont]{'★' * stars + '☆' * (max_stars - stars)}[/font]"
+        msg = f"{self.correct}/{self.questions_total} ({percent}%)\n{stars_line}"
+
+        title = self.get_translation('lesson_test_title')
 
         self.show_popup(
             title=title,
             text=msg,
-            size=(dp(320), dp(200)),
+            size=(dp(340), dp(220)),
             auto_dismiss=False,
             buttons=[(self.get_translation("ok"), lambda: self.app.switch_screen("lessons"))],
         )
+
+
+class PracticeLevelsScreen(BaseScreen):
+    title = StringProperty()
+    easy_level_btn = StringProperty()
+    medium_level_btn = StringProperty()
+    hard_level_btn = StringProperty()
+    quick_review_btn = StringProperty()
+    memory_game_title = StringProperty()
+    word_search_title = StringProperty()
+    games = StringProperty()
+
+    def update_lang(self):
+        super().update_lang()
+        self.title = self.get_translation('practice_levels_title')
+        self.easy_level_btn = self.get_translation('easy_level')
+        self.medium_level_btn = self.get_translation('medium_level')
+        self.hard_level_btn = self.get_translation('hard_level')
+        self.games = self.get_translation('games')
+        self.memory_game_title = self.get_translation('memory_game_title')
+        self.word_search_title = self.get_translation('word_search_title')
+        self.quick_review_btn = self.get_translation('quick_review')
+
+    def start_quick_review(self):
+        App.get_running_app().start_quick_review()
+
+    def start_medium_level(self):
+        scr = self.app.get_screen('medium_practice')
+        scr.quick_review_mode = False
+        self.app.switch_screen('medium_practice')
+
+    def start_easy_level(self):
+        scr = self.app.get_screen('practice')
+        scr.quick_review_mode = False
+        self.app.switch_screen('practice')
+        scr.new_question()
+
+    def start_hard_level(self):
+        self.app.switch_screen('hard_practice')
 
 
 class PracticeScreen(BaseScreen):
@@ -2124,20 +2772,14 @@ class PracticeScreen(BaseScreen):
     def __init__(self, **kwargs):
         self.current_streak = 0
         self.correct_button = None
-        self.clock_event = None
         self.scheduled_events = []
         self._answer_buttons = []
         self._last_layout_key = None
         self._grid_bound = False
         super().__init__(**kwargs)
-        self.bind(on_pre_enter=self.on_pre_enter)
-        self.bind(on_leave=self.on_leave)
 
     def handle_timeout(self):
-        self.timer_active = False
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
+        self.stop_timer()
 
         self._set_answer_buttons_enabled(False)
 
@@ -2171,13 +2813,15 @@ class PracticeScreen(BaseScreen):
         if not self.current_symbol:
             return
 
+        if self.current_symbol in digits_data:
+            pool = [s for s in pool if s in digits_data]
+        else:
+            pool = [s for s in pool if s not in digits_data]
+
         k = int(self.app.current_difficulty)
-        answers = [self.current_symbol]
-        while len(answers) < k:
-            d = random.choice(pool)
-            if d not in answers:
-                answers.append(d)
-        random.shuffle(answers)
+        k = max(2, min(k, len(pool)))
+
+        answers = self.build_answers_hamming(self.current_symbol, pool, k)
 
         horizontal_padding = dp(20)
         spacing = dp(5)
@@ -2257,9 +2901,7 @@ class PracticeScreen(BaseScreen):
             self._answer_buttons.append(btn)
 
     def on_pre_enter(self, *args):
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
+        self.cancel_all_events()
         self.update_lang()
         Clock.schedule_once(lambda dt: self.new_question(), 0)
 
@@ -2277,9 +2919,7 @@ class PracticeScreen(BaseScreen):
         self.update_streak_text(score_key="practice")
 
     def new_question(self):
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.timer_active = False
+        self.stop_timer()
 
         current_time = time.time()
 
@@ -2330,9 +2970,7 @@ class PracticeScreen(BaseScreen):
             btn.disabled_color = (1, 1, 1, 1)
 
     def check_answer(self, instance):
-        if self.timer_active:
-            self.clock_event.cancel()
-            self.timer_active = False
+        self.stop_timer()
 
         self._set_answer_buttons_enabled(False)
 
@@ -2401,17 +3039,16 @@ class MediumPracticeScreen(BaseScreen):
     quick_review_mode = BooleanProperty(False)
     time_left = NumericProperty(5)
     timer_active = BooleanProperty(False)
-    clock_event = None
     hint_used = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.dot_buttons = []
-        self.score = 0
         self.current_streak = 0
         self.scheduled_events = []
         self.hint_used = False
         self.current_letter = ''
+        self._pulse_anims = {}
 
     def _enable_controls(self):
         if self.dot_buttons:
@@ -2428,10 +3065,7 @@ class MediumPracticeScreen(BaseScreen):
         self.hint_btn = self.get_translation('hint_btn')
 
     def on_pre_enter(self, *args):
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
-
+        self.cancel_all_events()
         self.update_lang()
         self.load_braille_data()
 
@@ -2450,10 +3084,7 @@ class MediumPracticeScreen(BaseScreen):
         return visual_index
 
     def handle_timeout(self):
-        self.timer_active = False
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
+        self.stop_timer()
 
         self._disable_and_show_correct_answer()
 
@@ -2484,14 +3115,17 @@ class MediumPracticeScreen(BaseScreen):
 
             if correct and user:
                 btn.background_color = (0, 1, 0, 1)
+                self.animate_correct(btn)
             elif correct and not user:
                 btn.background_color = (1, 0.7, 0, 1)
+                self.animate_correct(btn)
             elif not correct and user:
                 btn.background_color = (1, 0, 0, 1)
             else:
                 btn.background_color = (1, 1, 1, 1)
 
     def new_question(self):
+        self._stop_all_pulses()
         self._enable_controls()
         self.user_input = [0] * 6
         self.hint_used = False
@@ -2529,10 +3163,24 @@ class MediumPracticeScreen(BaseScreen):
             self.start_timer()
 
     def on_dot_press(self, visual_index, instance):
-        logical_index = self.get_logical_index(visual_index)
+        if visual_index in self._pulse_anims:
+            Animation.cancel_all(instance, "background_color")
+            del self._pulse_anims[visual_index]
 
+        logical_index = self.get_logical_index(visual_index)
         self.user_input[logical_index] = 1 - self.user_input[logical_index]
+
         instance.background_color = (0.7, 0.7, 0.7, 1) if self.user_input[logical_index] else (1, 1, 1, 1)
+
+    def _stop_all_pulses(self):
+        for idx, btn in enumerate(self.dot_buttons):
+            Animation.cancel_all(btn, "background_color")
+            logical_idx = self.get_logical_index(idx)
+            if self.user_input[logical_idx]:
+                btn.background_color = (0.7, 0.7, 0.7, 1)
+            else:
+                btn.background_color = (1, 1, 1, 1)
+        self._pulse_anims.clear()
 
     def show_hint(self):
         if self.hint_used or not self.current_letter:
@@ -2543,23 +3191,31 @@ class MediumPracticeScreen(BaseScreen):
 
         for visual_index, btn in enumerate(self.dot_buttons):
             logical_index = self.get_logical_index(visual_index)
-            correct = self.current_dots[logical_index]
-            user = self.user_input[logical_index]
 
-            if correct and not user:
-                btn.background_color = (0.5, 1, 0.5, 1)
-            elif not correct and user:
-                btn.background_color = (1, 0.5, 0.5, 1)
-            elif correct and user:
-                btn.background_color = (0, 1, 0, 1)
+            is_target = self.current_dots[logical_index] == 1
+            is_pressed = self.user_input[logical_index] == 1
+
+            if is_target and not is_pressed:
+                btn.background_color = (0.7, 0.9, 1.0, 1)
+
+                anim = (
+                        Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55) +
+                        Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+                )
+                anim.repeat = True
+                anim.start(btn)
+                self._pulse_anims[visual_index] = anim
+
+            elif not is_target and is_pressed:
+                btn.background_color = (1, 0.6, 0.6, 1)
 
     def confirm_answer(self):
         if not self.current_letter:
             return
 
-        if self.timer_active:
-            self.clock_event.cancel()
-            self.timer_active = False
+        self._stop_all_pulses()
+
+        self.stop_timer()
 
         is_correct = (self.user_input == self.current_dots)
         self._disable_and_show_correct_answer(self.user_input)
@@ -2583,25 +3239,18 @@ class MediumPracticeScreen(BaseScreen):
         else:
             if is_correct:
                 if not self.hint_used:
-                    self.score += 1
                     self.current_streak += 1
                     if self.current_streak > self.app.high_scores[lang].get('medium_practice', 0):
                         self.app.high_scores[lang]['medium_practice'] = self.current_streak
                         self.app.save_high_scores()
             else:
-                self.score -= 1
                 self.current_streak = 0
             self.update_streak_text(score_key="medium_practice")
-            self.schedule_once(lambda dt: self.next_question(), 2)
+            self.schedule_once(lambda dt: self.new_question(), 2)
 
-    def next_question(self):
-        self.new_question()
-
-    def clear_input(self):
-        self.user_input = [0] * 6
-        for btn in self.dot_buttons:
-            btn.background_color = (1, 1, 1, 1)
-            btn.state = 'normal'
+    def on_leave(self, *args):
+        self._stop_all_pulses()
+        super().on_leave(*args)
 
 
 class HardPracticeScreen(BaseScreen):
@@ -2622,7 +3271,6 @@ class HardPracticeScreen(BaseScreen):
     quick_review_mode = BooleanProperty(False)
     time_left = NumericProperty(5)
     timer_active = BooleanProperty(False)
-    clock_event = None
 
     def __init__(self, **kwargs):
         self.correction_dot_buttons = []
@@ -2643,11 +3291,7 @@ class HardPracticeScreen(BaseScreen):
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
-
-        for event in self.scheduled_events:
-            event.cancel()
-        self.scheduled_events.clear()
-
+        self.cancel_all_events()
         self.load_braille_data()
         self.update_streak_text(score_key="hard_practice")
         self.new_question()
@@ -2676,10 +3320,7 @@ class HardPracticeScreen(BaseScreen):
         return "".join(word_list)
 
     def handle_timeout(self):
-        self.timer_active = False
-        if self.clock_event:
-            self.clock_event.cancel()
-            self.clock_event = None
+        self.stop_timer()
 
         self.lock_controls()
         if self.has_error:
@@ -2937,6 +3578,8 @@ class MemoryGameScreen(BaseScreen):
         super().__init__(**kwargs)
         self.input_locked = False
         self.pairs_count = 8
+        self._cards_pool = []
+        self._grid_built = False
 
     def on_moves(self, instance, value):
         self.update_moves_text()
@@ -2963,7 +3606,20 @@ class MemoryGameScreen(BaseScreen):
         self.moves = 0
 
         grid = self.ids.memory_grid
-        grid.clear_widgets()
+
+        if (not self._grid_built) or (len(self._cards_pool) != self.pairs_count * 2):
+            grid.clear_widgets()
+            self._cards_pool = []
+            for _ in range(self.pairs_count * 2):
+                card = MemoryCard(screen=self)
+                card.face_down = True
+                card.is_matched = False
+                card.disabled = False
+                card.text = ''
+                card.scale_x = 1
+                self._cards_pool.append(card)
+                grid.add_widget(card)
+            self._grid_built = True
 
         app = App.get_running_app()
         lang = app.current_language
@@ -2984,32 +3640,44 @@ class MemoryGameScreen(BaseScreen):
 
         game_chars = random.sample(chosen_chars, self.pairs_count)
 
-        cards_list = []
+        new_defs = []
+        ns = self.get_braille_char(number_sign_dots)
 
         for char in game_chars:
-            card_text = MemoryCard(screen=self)
-            card_text.content_text = char
-            card_text.pair_id = char
-            card_text.is_braille = False
-            cards_list.append(card_text)
-
-            card_braille = MemoryCard(screen=self)
+            new_defs.append((char, False, char))
 
             if char in digits_data:
                 dots = digits_data[char]
-                text_content = self.get_braille_char(number_sign_dots) + self.get_braille_char(dots)
+                braille_txt = ns + self.get_braille_char(dots)
             else:
                 dots = braille_data[lang][char]
-                text_content = self.get_braille_char(dots)
+                braille_txt = self.get_braille_char(dots)
 
-            card_braille.content_text = text_content
-            card_braille.pair_id = char
-            card_braille.is_braille = True
-            cards_list.append(card_braille)
+            new_defs.append((braille_txt, True, char))
 
-        random.shuffle(cards_list)
-        for card in cards_list:
-            grid.add_widget(card)
+        random.shuffle(new_defs)
+
+        for card, (content_text, is_braille, pair_id) in zip(self._cards_pool, new_defs):
+            card.screen = self
+            card.content_text = content_text
+            card.pair_id = pair_id
+            card.is_braille = is_braille
+
+            card.face_down = True
+            card.is_matched = False
+            card.disabled = False
+            card.text = ''
+            card.scale_x = 1
+            card.font_name = 'Roboto'
+            card.font_size = dp(32)
+
+        shuffled_cards = self._cards_pool[:]
+        random.shuffle(shuffled_cards)
+
+        for c in shuffled_cards:
+            grid.remove_widget(c)
+        for c in shuffled_cards:
+            grid.add_widget(c)
 
     def on_card_selected(self, card):
         if card not in self.selected_cards:
@@ -3050,50 +3718,72 @@ class MemoryGameScreen(BaseScreen):
 class BrailleWordSearchScreen(BaseScreen):
     title = StringProperty()
     words_title = StringProperty()
-    new_game_btn = StringProperty()
     status_text = StringProperty()
     grid_size = NumericProperty(8)
     words_line = StringProperty()
 
     def __init__(self, **kwargs):
-        self.cells = []
-        self.letters_grid = []
-        self.target_words = []
-        self.found_words = set()
-        self._found_paths = []
 
-        self._dragging = False
-        self._selected_indices = []
-        self._selected_set = set()
+        self.cells: list[Button] = []
 
-        self._dirs = [(0, 1), (1, 0)]
+        self._cells_n = 0
+
+        self._n: int = 7
+        self.letters_grid: list[str] = []
+        self.target_words: list[str] = []
+        self.target_set: set[str] = set()
+        self.found_words: set[str] = set()
+
+        self._found_paths: list[list[int]] = []
+        self._found_cells_cache: set[int] = set()
+        self._dragging: bool = False
+        self._selected_indices: list[int] = []
+        self._selected_set: set[int] = set()
+
+        self._occ: int = 0
+        self._paths_by_len: dict[int, tuple[tuple[int, ...], ...]] = {}
+
+        self._braille_char_map: dict[str, str] = {}
+
+        self._ws_geom = None
+        self._ws_pad = dp(8)
+        self._ws_sp = dp(4)
+
         super().__init__(**kwargs)
 
     def update_lang(self):
         super().update_lang()
-        self.title = self.get_translation('word_search_title')
-        self.words_title = self.get_translation('word_search_words_title')
-        self.new_game_btn = self.get_translation('word_search_new_game')
+        self.title = self.get_translation("word_search_title")
+        self.words_title = self.get_translation("word_search_words_title")
         self._update_status()
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
         self.load_braille_data()
+        self._braille_char_map = {ch: self.get_braille_char(dots) for ch, dots in self.braille_data.items()}
         self.start_new_game()
 
     def start_new_game(self):
+        self._found_cells_cache.clear()
         self.found_words.clear()
         self._found_paths.clear()
         self._clear_selection()
 
         self.grid_size = 7
+        self._n = int(self.grid_size)
+
         self.target_words = self._pick_words()
+        self.target_set = set(self.target_words)
 
-        self.letters_grid = [['' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
-        self._place_words()
-        self._fill_noise()
+        self._occ = 0
+        self._paths_by_len = {L: self.all_paths(self._n, L) for L in range(3, 7)}
 
-        self._build_grid_ui()
+        self.letters_grid = [""] * (self._n * self._n)
+
+        self._place_words_fast()
+        self._fill_noise_fast()
+
+        self._build_grid_ui_fast()
         self._build_words_ui()
         self._update_status()
 
@@ -3102,81 +3792,226 @@ class BrailleWordSearchScreen(BaseScreen):
         wl = self.app.word_lists.get(lang) or []
         letters_set = set(self.braille_data.keys())
 
-        candidates = [w for w in wl if 3 <= len(w) <= 6 and all(c in letters_set for c in w)]
+        candidates = list(set([w for w in wl if 3 <= len(w) <= 6 and all(c in letters_set for c in w)]))
+
         if len(candidates) < 8:
             items = list(letters_set)
-            candidates = list({''.join(random.choice(items) for _ in range(random.choice([3, 4, 5, 6])))
-                               for _ in range(60)})
+            random_words = {
+                "".join(random.choice(items) for _ in range(random.choice([3, 4, 5, 6])))
+                for _ in range(60)
+            }
+            candidates = list(set(candidates) | random_words)
 
         k = 6
         return random.sample(candidates, min(k, len(candidates)))
 
-    def _place_words(self):
-        for w in self.target_words:
-            for _ in range(200):
-                dr, dc = random.choice(self._dirs)
-                r0 = random.randint(0, self.grid_size - 1)
-                c0 = random.randint(0, self.grid_size - 1)
-
-                r1 = r0 + dr * (len(w) - 1)
-                c1 = c0 + dc * (len(w) - 1)
-                if not (0 <= r1 < self.grid_size and 0 <= c1 < self.grid_size):
-                    continue
-
-                rr, cc = r0, c0
-                if any(self.letters_grid[rr + dr * i][cc + dc * i] not in ('', ch) for i, ch in enumerate(w)):
-                    continue
-
-                for i, ch in enumerate(w):
-                    self.letters_grid[r0 + dr * i][c0 + dc * i] = ch
-                break
-
-    def _fill_noise(self):
+    def _fill_noise_fast(self):
         pool = list(self.braille_data.keys())
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                if not self.letters_grid[r][c]:
-                    self.letters_grid[r][c] = random.choice(pool)
+        n2 = self._n * self._n
+        for i in range(n2):
+            if not self.letters_grid[i]:
+                self.letters_grid[i] = random.choice(pool)
 
-    def _build_grid_ui(self):
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def all_paths(n, length):
+        def idx(r, c):
+            return r * n + c
+
+        paths = []
+
+        for r in range(n):
+            for c0 in range(0, n - length + 1):
+                paths.append([idx(r, c0 + i) for i in range(length)])
+
+        for r in range(n):
+            for c0 in range(length - 1, n):
+                paths.append([idx(r, c0 - i) for i in range(length)])
+
+        for c in range(n):
+            for r0 in range(0, n - length + 1):
+                paths.append([idx(r0 + i, c) for i in range(length)])
+
+        for c in range(n):
+            for r0 in range(length - 1, n):
+                paths.append([idx(r0 - i, c) for i in range(length)])
+
+        if length >= 3:
+            dirs = [
+                ((0, 1), (1, 0)), ((0, 1), (-1, 0)),
+                ((0, -1), (1, 0)), ((0, -1), (-1, 0)),
+                ((1, 0), (0, 1)), ((1, 0), (0, -1)),
+                ((-1, 0), (0, 1)), ((-1, 0), (0, -1)),
+            ]
+
+            for a in range(1, length - 1):
+                b = (length - 1) - a
+                for (dr1, dc1), (dr2, dc2) in dirs:
+                    for r0 in range(n):
+                        for c0 in range(n):
+                            cells = [(r0, c0)]
+                            r, c = r0, c0
+                            ok = True
+
+                            for _ in range(a):
+                                r += dr1
+                                c += dc1
+                                if not (0 <= r < n and 0 <= c < n):
+                                    ok = False
+                                    break
+                                cells.append((r, c))
+                            if not ok:
+                                continue
+
+                            for _ in range(b):
+                                r += dr2
+                                c += dc2
+                                if not (0 <= r < n and 0 <= c < n):
+                                    ok = False
+                                    break
+                                cells.append((r, c))
+
+                            if ok and len(cells) == length and len(set(cells)) == length:
+                                paths.append([idx(rr, cc) for rr, cc in cells])
+
+        if length >= 4:
+            configs = [
+                ((0, 1), (1, 0), (0, -1)),
+                ((0, 1), (-1, 0), (0, -1)),
+                ((0, -1), (1, 0), (0, 1)),
+                ((0, -1), (-1, 0), (0, 1)),
+            ]
+            for a in range(1, length - 2):
+                for b in range(1, (length - 1) - a):
+                    c3 = (length - 1) - a - b
+                    if c3 < 1:
+                        continue
+                    for (dr1, dc1), (dr2, dc2), (dr3, dc3) in configs:
+                        for r0 in range(n):
+                            for c0 in range(n):
+                                cells = [(r0, c0)]
+                                r, c = r0, c0
+                                ok = True
+
+                                for _ in range(a):
+                                    r += dr1
+                                    c += dc1
+                                    if not (0 <= r < n and 0 <= c < n):
+                                        ok = False
+                                        break
+                                    cells.append((r, c))
+                                if not ok:
+                                    continue
+
+                                for _ in range(b):
+                                    r += dr2
+                                    c += dc2
+                                    if not (0 <= r < n and 0 <= c < n):
+                                        ok = False
+                                        break
+                                    cells.append((r, c))
+                                if not ok:
+                                    continue
+
+                                for _ in range(c3):
+                                    r += dr3
+                                    c += dc3
+                                    if not (0 <= r < n and 0 <= c < n):
+                                        ok = False
+                                        break
+                                    cells.append((r, c))
+
+                                if ok and len(cells) == length and len(set(cells)) == length:
+                                    paths.append([idx(rr, cc) for rr, cc in cells])
+
+        return tuple(tuple(p) for p in paths)
+
+    def _can_place_word_on_path(self, word, path):
+        occ = self._occ
+        for idx in path:
+            if (occ >> idx) & 1:
+                return False
+        return True
+
+    def _place_word_on_path_1d(self, word, path):
+        for ch, idx in zip(word, path):
+            self.letters_grid[idx] = ch
+            self._occ |= (1 << idx)
+
+    def _place_words_fast(self):
+        words = sorted(self.target_words, key=len, reverse=True)
+        placed = []
+
+        for w in words:
+            paths = self._paths_by_len.get(len(w), ())
+            if not paths:
+                continue
+
+            start = random.randrange(len(paths))
+
+            for k in range(len(paths)):
+                path = paths[(start + k) % len(paths)]
+                if self._can_place_word_on_path(w, path):
+                    self._place_word_on_path_1d(w, path)
+                    placed.append(w)
+                    break
+
+        self.target_words = placed
+        self.target_set = set(placed)
+
+    def _ensure_grid_ui(self):
         grid = self.ids.ws_grid
+        need = self._n * self._n
+
+        if self._cells_n == need and len(self.cells) == need:
+            return
+
         grid.clear_widgets()
-        grid.cols = int(self.grid_size)
         self.cells = []
+        grid.cols = int(self._n)
+        self._cells_n = need
 
-        base = dp(58) if self.grid_size <= 6 else dp(52)
+        for idx in range(need):
+            btn = Button(
+                font_name="BrailleFont",
+                background_normal="",
+                background_down="",
+                background_color=(0.2, 0.2, 0.2, 1),
+                color=(1, 1, 1, 1),
+                padding=(0, 0),
+                halign="center",
+                valign="middle",
+            )
+            btn.ws_index = idx
 
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                ch = self.letters_grid[r][c]
-                dots = self.braille_data.get(ch)
-                braille = self.get_braille_char(dots) if dots else '?'
+            btn.bind(size=lambda inst, *_: setattr(inst, "text_size", inst.size))
 
-                btn = Button(
-                    text=braille,
-                    font_name='BrailleFont',
-                    font_size=base,
-                    background_normal='',
-                    background_down='',
-                    background_color=(0.2, 0.2, 0.2, 1),
-                    color=(1, 1, 1, 1),
-                )
-                btn.disabled_color = (1, 1, 1, 1)
-                btn.background_disabled_normal = ''
-                btn.background_disabled_down = ''
-                btn.ws_index = r * self.grid_size + c
-                btn.bind(on_touch_down=self._on_cell_touch_down,
-                         on_touch_move=self._on_cell_touch_move,
-                         on_touch_up=self._on_cell_touch_up)
+            btn.bind(
+                on_touch_down=self._on_cell_touch_down,
+                on_touch_move=self._on_cell_touch_move,
+                on_touch_up=self._on_cell_touch_up,
+            )
 
-                self.cells.append(btn)
-                grid.add_widget(btn)
+            self.cells.append(btn)
+            grid.add_widget(btn)
 
-        self.schedule_once(lambda dt: self._autoscale_cells(), 0)
+    def _build_grid_ui_fast(self):
+        self._ensure_grid_ui()
+        self.ids.ws_grid.cols = int(self._n)
+
+        m = self._braille_char_map
+        for idx, ch in enumerate(self.letters_grid):
+            btn = self.cells[idx]
+            btn.text = m.get(ch, "?")
+
+        Clock.schedule_once(lambda dt: self._autoscale_cells(), 0)
+
+        self._repaint()
 
     def _autoscale_cells(self):
         for btn in self.cells:
-            btn.font_size = max(dp(24), min(dp(72), btn.height * 0.85))
+            side = min(btn.width, btn.height)
+            btn.font_size = max(dp(18), min(dp(72), side * 0.75))
 
     def _build_words_ui(self):
         self._refresh_words_ui()
@@ -3185,67 +4020,89 @@ class BrailleWordSearchScreen(BaseScreen):
         parts = []
         for w in self.target_words:
             if w in self.found_words:
-                parts.append(f"[color=33aa33]{w}[/color]")
+                parts.append(f"[color=33aa3388]{w}[/color]")
             else:
                 parts.append(w)
         self.words_line = "  ".join(parts)
 
     def _update_status(self):
-        fmt = self.get_translation('word_search_status')
+        fmt = self.get_translation("word_search_status")
         self.status_text = fmt.format(len(self.found_words), len(self.target_words))
 
     def _clear_selection(self):
         self._dragging = False
+        old = set(self._selected_set)
         self._selected_indices.clear()
         self._selected_set.clear()
-        self._repaint()
-
-    def _found_cells_set(self):
-        s = set()
-        for p in self._found_paths:
-            s.update(p)
-        return s
+        if old:
+            self._repaint_delta(old_removed=old, new_added=set())
 
     def _repaint(self):
-        found_cells = self._found_cells_set()
+        found_cells = self._found_cells_cache
 
-        base_bg = (0.2, 0.2, 0.2, 1)
-        base_fg = (1, 1, 1, 1)
-
-        selected_bg = (0.7, 0.7, 0.7, 1)
-        selected_fg = (0, 0, 0, 1)
-
-        found_bg = (0.2, 0.7, 0.2, 1)
-        found_fg = (1, 1, 1, 1)
+        base_bg, base_fg = (0.2, 0.2, 0.2, 1), (1, 1, 1, 1)
+        sel_bg, sel_fg = (0.7, 0.7, 0.7, 1), (0, 0, 0, 1)
+        found_bg, found_fg = (0.2, 0.7, 0.2, 1), (1, 1, 1, 1)
 
         for btn in self.cells:
             idx = btn.ws_index
             if idx in found_cells:
                 btn.background_color, btn.color = found_bg, found_fg
             elif idx in self._selected_set:
-                btn.background_color, btn.color = selected_bg, selected_fg
+                btn.background_color, btn.color = sel_bg, sel_fg
             else:
                 btn.background_color, btn.color = base_bg, base_fg
+
+    def _repaint_delta(self, *, old_removed: set[int], new_added: set[int]):
+        found = self._found_cells_cache
+
+        base_bg, base_fg = (0.2, 0.2, 0.2, 1), (1, 1, 1, 1)
+        sel_bg, sel_fg = (0.7, 0.7, 0.7, 1), (0, 0, 0, 1)
+        found_bg, found_fg = (0.2, 0.7, 0.2, 1), (1, 1, 1, 1)
+
+        def apply(idx: int):
+            btn = self.cells[idx]
+            if idx in found:
+                btn.background_color, btn.color = found_bg, found_fg
+            elif idx in self._selected_set:
+                btn.background_color, btn.color = sel_bg, sel_fg
+            else:
+                btn.background_color, btn.color = base_bg, base_fg
+
+        for idx in old_removed:
+            apply(idx)
+        for idx in new_added:
+            apply(idx)
 
     def _on_cell_touch_down(self, btn, touch):
         if not btn.collide_point(*touch.pos):
             return False
+
         self._dragging = True
+
+        old = set(self._selected_set)
         self._selected_indices.clear()
         self._selected_set.clear()
-        self._add_to_selection(btn.ws_index)
-        self._repaint()
+
+        idx = self._index_from_pos(*touch.pos)
+        if idx is None:
+            idx = btn.ws_index
+
+        self._selected_indices.append(idx)
+        self._selected_set.add(idx)
+
+        self._repaint_delta(old_removed=old, new_added={idx})
+
         touch.grab(btn)
         return True
 
     def _on_cell_touch_move(self, btn, touch):
         if touch.grab_current is not btn or not self._dragging:
             return False
-        for b in self.cells:
-            if b.collide_point(*touch.pos):
-                self._add_to_selection(b.ws_index)
-                break
-        self._repaint()
+
+        idx = self._index_from_pos(*touch.pos)
+        if idx is not None:
+            self._add_to_selection(idx)
         return True
 
     def _on_cell_touch_up(self, btn, touch):
@@ -3257,40 +4114,36 @@ class BrailleWordSearchScreen(BaseScreen):
             self._finalize_selection()
         return True
 
-    def _add_to_selection(self, idx):
+    def _add_to_selection(self, idx: int):
         if idx in self._selected_set:
             return
 
         if self._selected_indices:
             last = self._selected_indices[-1]
-            lr, lc = divmod(last, self.grid_size)
-            cr, cc = divmod(idx, self.grid_size)
+            lr, lc = divmod(last, self._n)
+            cr, cc = divmod(idx, self._n)
             if abs(cr - lr) + abs(cc - lc) != 1:
-                return
-
-        if len(self._selected_indices) >= 2:
-            a = self._selected_indices[0]
-            ar, ac = divmod(a, self.grid_size)
-            cr, cc = divmod(idx, self.grid_size)
-            if not (cr == ar or cc == ac):
                 return
 
         self._selected_indices.append(idx)
         self._selected_set.add(idx)
+        self._repaint_delta(old_removed=set(), new_added={idx})
 
     def _finalize_selection(self):
         if len(self._selected_indices) < 3:
             self._clear_selection()
             return
 
-        letters = [self.letters_grid[r][c] for (r, c) in (divmod(i, self.grid_size) for i in self._selected_indices)]
-        s = ''.join(letters)
+        letters = [self.letters_grid[i] for i in self._selected_indices]
+        s = "".join(letters)
         s_rev = s[::-1]
 
-        matched = next((w for w in self.target_words if w == s or w == s_rev), None)
+        matched = s if s in self.target_set else (s_rev if s_rev in self.target_set else None)
         if matched and matched not in self.found_words:
             self.found_words.add(matched)
             self._found_paths.append(list(self._selected_indices))
+            self._found_cells_cache.update(self._selected_indices)
+
             self._refresh_words_ui()
             self._update_status()
 
@@ -3299,181 +4152,66 @@ class BrailleWordSearchScreen(BaseScreen):
 
         self._clear_selection()
 
+    def on_kv_post(self, *a):
+        self._ws_geom = None
+        self.ids.ws_grid.bind(pos=self._invalidate_ws_geom, size=self._invalidate_ws_geom)
 
-class PracticeLevelsScreen(BaseScreen):
-    title = StringProperty()
-    easy_level_btn = StringProperty()
-    medium_level_btn = StringProperty()
-    hard_level_btn = StringProperty()
-    quick_review_btn = StringProperty()
-    memory_game_title = StringProperty()
-    word_search_title = StringProperty()
-    games = StringProperty()
+    def _invalidate_ws_geom(self, *a):
+        self._ws_geom = None
 
-    def update_lang(self):
-        super().update_lang()
-        self.title = self.get_translation('practice_levels_title')
-        self.easy_level_btn = self.get_translation('easy_level')
-        self.medium_level_btn = self.get_translation('medium_level')
-        self.hard_level_btn = self.get_translation('hard_level')
-        self.games = self.get_translation('games')
-        self.memory_game_title = self.get_translation('memory_game_title')
-        self.word_search_title = self.get_translation('word_search_title')
-        self.quick_review_btn = self.get_translation('quick_review')
+    def _ensure_ws_geom(self):
+        if self._ws_geom is not None:
+            return
 
-    def start_quick_review(self):
-        App.get_running_app().start_quick_review()
+        grid = self.ids.ws_grid
+        n = int(self._n)
 
-    def start_medium_level(self):
-        scr = self.app.get_screen('medium_practice')
-        scr.quick_review_mode = False
-        self.app.switch_screen('medium_practice')
+        pad = self._ws_pad
+        sp = self._ws_sp
 
-    def start_easy_level(self):
-        scr = self.app.get_screen('practice')
-        scr.quick_review_mode = False
-        self.app.switch_screen('practice')
-        scr.new_question()
+        inner_w = grid.width - 2 * pad
+        inner_h = grid.height - 2 * pad
+        if inner_w <= 0 or inner_h <= 0:
+            self._ws_geom = None
+            return
 
-    def start_hard_level(self):
-        self.app.switch_screen('hard_practice')
+        cell_w = (inner_w - sp * (n - 1)) / n
+        cell_h = (inner_h - sp * (n - 1)) / n
 
+        self._ws_geom = (pad, sp, n, n, cell_w, cell_h, grid.x, grid.y)
 
-class SettingsScreen(BaseScreen):
-    settings_title = StringProperty()
-    language_label = StringProperty()
-    difficulty_label = StringProperty()
-    current_lang = StringProperty()
-    current_difficulty_str = StringProperty()
-    languages = DictProperty(LANGUAGES)
-    difficulty_values = ListProperty()
-    time_label = StringProperty()
-    time_hint = StringProperty()
-    use_stats = StringProperty()
-    reset_stats_btn = StringProperty()
-    general_settings_header = StringProperty()
-    easy_mode_header = StringProperty()
-    quick_review_header = StringProperty()
-    medium_mode_header = StringProperty()
-    mirror_mode_label = StringProperty()
-    include_letters = StringProperty()
-    include_digits = StringProperty()
-    memory_game_title = StringProperty()
+    def _index_from_pos(self, x, y):
+        grid = self.ids.ws_grid
+        if not grid.collide_point(x, y):
+            return None
 
-    def update_lang(self):
-        super().update_lang()
-        lang = self.app.current_language
-        self.settings_title = self.get_translation('settings_title')
-        self.language_label = self.get_translation('language_label')
-        self.difficulty_label = self.get_translation('difficulty_label')
-        self.use_stats = self.get_translation('use_stats')
-        self.reset_stats_btn = self.get_translation('reset_stats_btn')
-        self.time_label = self.get_translation('time_label')
-        self.time_hint = self.get_translation('time_hint')
-        self.general_settings_header = self.get_translation('general_settings_header')
-        self.easy_mode_header = self.get_translation('easy_mode_header')
-        self.quick_review_header = self.get_translation('quick_review_header')
-        self.medium_mode_header = self.get_translation('medium_mode_header')
-        self.mirror_mode_label = self.get_translation('mirror_mode_label')
-        self.include_letters = self.get_translation('include_letters')
-        self.include_digits = self.get_translation('include_digits')
-        self.memory_game_title = self.get_translation('memory_game_title')
-        self.current_lang = LANGUAGES[lang]
-        self.difficulty_values = [
-            self.get_translation(f'difficulty_{d}')
-            for d in ['2', '4', '6', '8', '10']]
-        self.current_difficulty_str = self.get_translation(
-            f'difficulty_{self.app.current_difficulty}')
+        self._ensure_ws_geom()
+        g = self._ws_geom
+        if not g:
+            return None
 
-    def update_settings(self, key, value):
-        if key == 'language':
-            lang_code = next((k for k, v in LANGUAGES.items() if v == value), 'en')
-            self.app.current_language = lang_code
-            self.app.load_word_list(lang_code)
-            self.current_lang = LANGUAGES[lang_code]
-        elif key == 'difficulty':
-            diff_code = next((k.split('_')[1] for k, v in translations[self.app.current_language].items()
-                              if v == value and k.startswith('difficulty_')), '4')
-            self.app.current_difficulty = diff_code
-        elif key == 'time':
-            try:
-                t = int(value) if value else 5
-                if 1 <= t <= 25:
-                    self.app.quick_review_time = t
-                else:
-                    self.app.quick_review_time = 5
-            except ValueError:
-                self.app.quick_review_time = 5
-        self.app.save_settings()
-        self.app.update_all_screens()
+        pad, sp, cols, rows, cell_w, cell_h, gx, gy = g
 
-    def update_mirror_mode(self, active):
-        self.app.mirror_writing_mode = active
-        self.app.save_settings()
+        lx = x - gx
+        ly = y - gy
 
-    def update_update_use_stats(self, active):
-        self.app.use_stats = active
-        self.app.save_settings()
-        if 'reference' in self.app._loaded_screens:
-            ref_screen = self.app.get_screen('reference')
-            if hasattr(ref_screen, 'update_reference'):
-                ref_screen.update_reference()
+        local_x = lx - pad
+        local_y = ly - pad
+        if local_x < 0 or local_y < 0:
+            return None
 
-    def _prevent_both_off(self, mode):
-        if mode == 'easy':
-            if not self.app.easy_mode_letters and not self.app.easy_mode_digits:
-                return True
-        elif mode == 'medium':
-            if not self.app.medium_mode_letters and not self.app.medium_mode_digits:
-                return True
-        return False
+        col = int(local_x // (cell_w + sp))
+        row_from_bottom = int(local_y // (cell_h + sp))
+        if not (0 <= col < cols and 0 <= row_from_bottom < rows):
+            return None
 
-    def toggle_mode_flag(self, attr: str, value: bool, other_attr: str, other_switch_id: str):
-        setattr(self.app, attr, value)
-        if not value and not getattr(self.app, other_attr):
-            setattr(self.app, other_attr, True)
-            Clock.schedule_once(lambda dt: setattr(self.ids[other_switch_id], "active", True))
-        self.app.save_settings()
+        x_in = local_x - col * (cell_w + sp)
+        y_in = local_y - row_from_bottom * (cell_h + sp)
+        if x_in > cell_w or y_in > cell_h:
+            return None
 
-    def toggle_easy_letters(self, v):
-        self.toggle_mode_flag("easy_mode_letters", v, "easy_mode_digits", "easy_digits_sw")
-
-    def toggle_easy_digits(self, v):
-        self.toggle_mode_flag("easy_mode_digits", v, "easy_mode_letters", "easy_letters_sw")
-
-    def toggle_medium_letters(self, v):
-        self.toggle_mode_flag("medium_mode_letters", v, "medium_mode_digits", "medium_digits_sw")
-
-    def toggle_medium_digits(self, v):
-        self.toggle_mode_flag("medium_mode_digits", v, "medium_mode_letters", "medium_letters_sw")
-
-    def toggle_memo_letters(self, v):
-        self.toggle_mode_flag("memo_mode_letters", v, "memo_mode_digits", "memo_digits_sw")
-
-    def toggle_memo_digits(self, v):
-        self.toggle_mode_flag("memo_mode_digits", v, "memo_mode_letters", "memo_letters_sw")
-
-    def reset_stats(self):
-        def do_reset():
-            self.app.stats = {'en': {}, 'ru': {}, 'dru': {}}
-            self.app.save_stats()
-
-        self.show_popup(
-            title=self.get_translation("reset_stats_title"),
-            text=self.get_translation("reset_stats_text"),
-            size=(dp(360), dp(260)),
-            auto_dismiss=False,
-            font_size=dp(18),
-            text_width=dp(300),
-            buttons=[
-                (self.get_translation("yes"), do_reset),
-                (self.get_translation("no"), None),
-            ],
-            buttons_height=dp(60),
-            buttons_spacing=dp(20),
-            padding=[dp(30), dp(20), dp(30), dp(20)],
-            spacing=dp(20),
-        )
+        row = (rows - 1) - row_from_bottom
+        return row * cols + col
 
 
 class ReferenceRow(BoxLayout):
@@ -3494,7 +4232,7 @@ class ReferenceScreen(BaseScreen):
         self.app = App.get_running_app()
         self.update_lang()
 
-        key = (self.app.current_language, bool(self.app.use_stats))
+        key = self.app.current_language
         if self._built_key != key:
             self._built_key = key
             self._build_rv_data()
@@ -3525,11 +4263,8 @@ class ReferenceScreen(BaseScreen):
         for ch, dots in letters_items:
             braille_char = self.get_braille_char(dots)
 
-            if self.app.use_stats:
-                st = self.app.stats[lang].get(ch, {"correct": 0, "wrong": 0})
-                stats_text = stats_fmt.format(st["correct"], st["wrong"])
-            else:
-                stats_text = ""
+            st = self.app.stats[lang].get(ch, {"correct": 0, "wrong": 0})
+            stats_text = stats_fmt.format(st["correct"], st["wrong"])
 
             data.append({
                 "viewclass": "ReferenceRow",
@@ -3595,10 +4330,12 @@ class TranslatorScreen(BaseScreen):
     dot_buttons = ListProperty([])
     _last_translated_text = StringProperty()
     full_braille_text = StringProperty()
+    ns_char = StringProperty("")
+    reverse_letters = {}
+    reverse_digits = {}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.braille_to_char = {}
         self.input_number_mode = False
 
     def on_kv_post(self, base_widget):
@@ -3609,7 +4346,17 @@ class TranslatorScreen(BaseScreen):
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
         self.load_braille_data()
-        self.braille_to_char = {tuple(v): k for k, v in self.braille_data.items()}
+        self.ns_char = self.get_braille_char(number_sign_dots)
+        self.reverse_letters = {
+            self.get_braille_char(dots): char
+            for char, dots in self.braille_data.items()
+        }
+
+        self.reverse_digits = {
+            self.get_braille_char(dots): digit
+            for digit, dots in digits_data.items()
+        }
+
         Clock.schedule_once(lambda dt: self.live_translate(), 0.1)
 
     def update_lang(self):
@@ -3619,17 +4366,17 @@ class TranslatorScreen(BaseScreen):
         self.input_braille_btn = self.get_translation('input_braille_btn')
         self.confirm_btn = self.get_translation('confirm_btn')
         self.delete_btn = self.get_translation('delete_btn')
-        self.copy_btn = self.get_translation('copy_result')
+        self.copy_btn = self.get_translation('copy')
 
-    def live_translate(self, *args):
-        text = self.ids.input_text.text.upper()
-        if text == self._last_translated_text:
-            return
+    def _contains_braille(self, s):
+        return any(0x2800 <= ord(ch) <= 0x28FF for ch in s)
 
+    def _translate_text_to_braille(self, text):
+        text = text.upper()
         result = []
-        current_data = self.braille_data
         in_number_mode = False
-        ns = self.get_braille_char(number_sign_dots)
+
+        ns = self.ns_char
 
         for char in text:
             if char == '\n':
@@ -3641,38 +4388,90 @@ class TranslatorScreen(BaseScreen):
                 if not in_number_mode:
                     result.append(ns)
                     in_number_mode = True
-                if char in digits_data:
-                    result.append(self.get_braille_char(digits_data[char]))
-                else:
-                    result.append('?')
+                result.append(self.get_braille_char(digits_data.get(char, [0, 0, 0, 0, 0, 0])))
                 continue
 
             in_number_mode = False
             if char == ' ':
                 result.append(chr(0x2800))
-            elif char in current_data:
-                result.append(self.get_braille_char(current_data[char]))
+            elif char in self.braille_data:
+                result.append(self.get_braille_char(self.braille_data[char]))
             else:
-                result.append('?')
+                result.append(char)
 
-        braille_text = ''.join(result)
-        self.full_braille_text = braille_text
-        self._last_translated_text = text
+        return ''.join(result)
+
+    def _translate_braille_to_text(self, s):
+        out = []
+        number_mode = False
+        ns = self.ns_char
+
+        for ch in s:
+            if ch == '\n':
+                out.append('\n')
+                number_mode = False
+                continue
+
+            if ch == ' ' or ord(ch) == 0x2800:
+                out.append(' ')
+                number_mode = False
+                continue
+
+            if not (0x2800 <= ord(ch) <= 0x28FF):
+                out.append(ch)
+                number_mode = False
+                continue
+
+            if ch == ns:
+                number_mode = True
+                continue
+
+            decoded = '?'
+
+            if number_mode:
+                if ch in self.reverse_digits:
+                    decoded = self.reverse_digits[ch]
+                else:
+                    decoded = self.reverse_letters.get(ch, '?')
+                    number_mode = False
+            else:
+                decoded = self.reverse_letters.get(ch, '?')
+
+            out.append(decoded)
+
+        return ''.join(out)
+
+    def live_translate(self, *args):
+        raw = self.ids.input_text.text
+        if raw == self._last_translated_text:
+            return
+
+        if self._contains_braille(raw):
+            plain = self._translate_braille_to_text(raw)
+            out_text = plain
+            font = 'Roboto'
+            fs = dp(28)
+            self.full_braille_text = raw
+        else:
+            braille_text = self._translate_text_to_braille(raw)
+            self.full_braille_text = braille_text
+            out_text = braille_text
+            font = 'BrailleFont'
+            fs = dp(32)
+
+        self._last_translated_text = raw
 
         output_box = self.ids.braille_output_box
         output_box.clear_widgets()
 
         chunk_size = 500
-        if not braille_text:
-            chunks = []
-        else:
-            chunks = [braille_text[i:i + chunk_size] for i in range(0, len(braille_text), chunk_size)]
+        chunks = [out_text[i:i + chunk_size] for i in range(0, len(out_text), chunk_size)] if out_text else []
 
         for chunk in chunks:
             lbl = Label(
                 text=chunk,
-                font_name='BrailleFont',
-                font_size=dp(32),
+                font_name=font,
+                font_size=fs,
                 size_hint_y=None,
                 color=(1, 1, 1, 1),
                 halign='center',
@@ -3680,7 +4479,6 @@ class TranslatorScreen(BaseScreen):
             )
             lbl.bind(width=lambda instance, value: setattr(instance, 'text_size', (value, None)))
             lbl.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
-
             output_box.add_widget(lbl)
 
     def copy_braille_result(self):
@@ -3718,36 +4516,16 @@ class TranslatorScreen(BaseScreen):
         input_dots = tuple(self.user_braille_dots)
 
         if all(d == 0 for d in input_dots):
-            self.ids.input_text.text += ' '
-            self.input_number_mode = False
+            self.ids.input_text.insert_text(chr(0x2800))
             self.clear_braille_input()
             return
 
-        if input_dots == tuple(number_sign_dots):
-            self.input_number_mode = True
-            self.clear_braille_input()
-            return
-
-        char = '?'
-        if self.input_number_mode:
-            found_digit = False
-            for digit, dots in digits_data.items():
-                if tuple(dots) == input_dots:
-                    char = digit
-                    found_digit = True
-                    break
-            if not found_digit:
-                char = self.braille_to_char.get(input_dots, '?')
-        else:
-            char = self.braille_to_char.get(input_dots, '?')
-
-        self.ids.input_text.text += char
+        braille_char = self.get_braille_char(list(input_dots))
+        self.ids.input_text.insert_text(braille_char)
         self.clear_braille_input()
 
     def delete_last_char(self):
-        text = self.ids.input_text.text
-        if text:
-            self.ids.input_text.text = text[:-1]
+        self.ids.input_text.do_backspace()
 
     def clear_braille_input(self):
         self.user_braille_dots = [0] * 6
@@ -3759,6 +4537,193 @@ class TranslatorScreen(BaseScreen):
         self.close_braille_input()
 
 
+class SettingsScreen(BaseScreen):
+    settings_title = StringProperty()
+    language_label = StringProperty()
+    difficulty_label = StringProperty()
+    current_lang = StringProperty()
+    current_difficulty_str = StringProperty()
+    languages = DictProperty(LANGUAGES)
+    difficulty_values = ListProperty()
+    time_label = StringProperty()
+    time_hint = StringProperty()
+    use_stats = StringProperty()
+    reset_stats_btn = StringProperty()
+    reset_lessons_btn = StringProperty()
+    general_settings_header = StringProperty()
+    easy_mode_header = StringProperty()
+    quick_review_header = StringProperty()
+    medium_mode_header = StringProperty()
+    mirror_mode_label = StringProperty()
+    quick_mode_easy_label = StringProperty()
+    quick_mode_medium_label = StringProperty()
+    quick_mode_hard_label = StringProperty()
+    include_letters = StringProperty()
+    include_digits = StringProperty()
+    memory_game_title = StringProperty()
+
+    def update_lang(self):
+        super().update_lang()
+        lang = self.app.current_language
+        self.settings_title = self.get_translation('settings_title')
+        self.language_label = self.get_translation('language_label')
+        self.difficulty_label = self.get_translation('difficulty_label')
+        self.use_stats = self.get_translation('use_stats')
+        self.reset_stats_btn = self.get_translation('reset_stats_btn')
+        self.reset_lessons_btn = self.get_translation('reset_lessons_btn')
+        self.time_label = self.get_translation('time_label')
+        self.time_hint = self.get_translation('time_hint')
+        self.general_settings_header = self.get_translation('general_settings_header')
+        self.easy_mode_header = self.get_translation('easy_mode_header')
+        self.quick_review_header = self.get_translation('quick_review_header')
+        self.medium_mode_header = self.get_translation('medium_mode_header')
+        self.mirror_mode_label = self.get_translation('mirror_mode_label')
+        self.include_letters = self.get_translation('include_letters')
+        self.include_digits = self.get_translation('include_digits')
+        self.memory_game_title = self.get_translation('memory_game_title')
+        self.quick_mode_easy_label = self.get_translation('easy_level')
+        self.quick_mode_medium_label = self.get_translation('medium_level')
+        self.quick_mode_hard_label = self.get_translation('hard_level')
+        self.current_lang = LANGUAGES[lang]
+        self.difficulty_values = [
+            self.get_translation(f'difficulty_{d}')
+            for d in ['2', '4', '6', '8', '10']]
+        self.current_difficulty_str = self.get_translation(
+            f'difficulty_{self.app.current_difficulty}')
+
+    def update_settings(self, key, value):
+        if key == 'language':
+            lang_code = next((k for k, v in LANGUAGES.items() if v == value), 'en')
+            self.app.current_language = lang_code
+            self.app.load_word_list(lang_code)
+            self.current_lang = LANGUAGES[lang_code]
+        elif key == 'difficulty':
+            diff_code = next((k.split('_')[1] for k, v in translations[self.app.current_language].items()
+                              if v == value and k.startswith('difficulty_')), '4')
+            self.app.current_difficulty = diff_code
+        elif key == 'time':
+            try:
+                t = int(value) if value else 5
+                if 1 <= t <= 25:
+                    self.app.quick_review_time = t
+                else:
+                    self.app.quick_review_time = 5
+            except ValueError:
+                self.app.quick_review_time = 5
+        self.app.save_settings()
+        self.app.update_all_screens()
+
+    def update_mirror_mode(self, active):
+        self.app.mirror_writing_mode = active
+        self.app.save_settings()
+
+    def update_update_use_stats(self, active):
+        self.app.use_stats = active
+        self.app.save_settings()
+
+    def toggle_mode_flag(self, attr: str, value: bool, other_attr: str, other_switch_id: str):
+        setattr(self.app, attr, value)
+        if not value and not getattr(self.app, other_attr):
+            setattr(self.app, other_attr, True)
+            Clock.schedule_once(lambda dt: setattr(self.ids[other_switch_id], "active", True))
+        self.app.save_settings()
+
+    def toggle_easy_letters(self, v):
+        self.toggle_mode_flag("easy_mode_letters", v, "easy_mode_digits", "easy_digits_sw")
+
+    def toggle_easy_digits(self, v):
+        self.toggle_mode_flag("easy_mode_digits", v, "easy_mode_letters", "easy_letters_sw")
+
+    def toggle_medium_letters(self, v):
+        self.toggle_mode_flag("medium_mode_letters", v, "medium_mode_digits", "medium_digits_sw")
+
+    def toggle_medium_digits(self, v):
+        self.toggle_mode_flag("medium_mode_digits", v, "medium_mode_letters", "medium_letters_sw")
+
+    def toggle_quick_easy(self, v: bool):
+        self.app.quick_mode_easy = v
+        if (not v) and (not self.app.quick_mode_medium) and (not self.app.quick_mode_hard):
+            self.app.quick_mode_medium = True
+            Clock.schedule_once(lambda dt: setattr(self.ids["quick_medium_sw"], "active", True), 0)
+        self.app.save_settings()
+
+    def toggle_quick_medium(self, v: bool):
+        self.app.quick_mode_medium = v
+        if (not v) and (not self.app.quick_mode_easy) and (not self.app.quick_mode_hard):
+            self.app.quick_mode_hard = True
+            Clock.schedule_once(lambda dt: setattr(self.ids["quick_hard_sw"], "active", True), 0)
+        self.app.save_settings()
+
+    def toggle_quick_hard(self, v: bool):
+        self.app.quick_mode_hard = v
+        if (not v) and (not self.app.quick_mode_easy) and (not self.app.quick_mode_medium):
+            self.app.quick_mode_easy = True
+            Clock.schedule_once(lambda dt: setattr(self.ids["quick_easy_sw"], "active", True), 0)
+        self.app.save_settings()
+
+    def toggle_memo_letters(self, v):
+        self.toggle_mode_flag("memo_mode_letters", v, "memo_mode_digits", "memo_digits_sw")
+
+    def toggle_memo_digits(self, v):
+        self.toggle_mode_flag("memo_mode_digits", v, "memo_mode_letters", "memo_letters_sw")
+
+    def reset_stats(self):
+        lang = self.app.current_language
+
+        def do_reset():
+            self.app.stats[lang] = {}
+            self.app.save_stats()
+
+        self.show_popup(
+            title=self.get_translation("reset_stats_title"),
+            text=self.get_translation("reset_stats_text"),
+            size=(dp(360), dp(260)),
+            auto_dismiss=False,
+            font_size=dp(18),
+            text_width=dp(300),
+            buttons=[
+                (self.get_translation("yes"), do_reset),
+                (self.get_translation("no"), None),
+            ],
+            buttons_height=dp(60),
+            buttons_spacing=dp(20),
+            padding=[dp(30), dp(20), dp(30), dp(20)],
+            spacing=dp(20),
+        )
+
+    def reset_lessons_progress(self):
+        def do_reset():
+            lang = self.app.current_language
+
+            for key in (lang, "digits_common"):
+                if key in self.app.lessons_progress:
+                    self.app.lessons_progress[key] = {"completed_count": 0, "progress": {}}
+
+            self.app.save_lessons_progress()
+
+            if "lessons" in self.app._loaded_screens:
+                scr = self.app.get_screen("lessons")
+                scr._built_key = None
+                scr.refresh_lessons(force=True)
+
+        self.show_popup(
+            title=self.get_translation("reset_lessons_title"),
+            text=self.get_translation("reset_lessons_text"),
+            size=(dp(360), dp(260)),
+            auto_dismiss=False,
+            font_size=dp(18),
+            text_width=dp(320),
+            buttons=[
+                (self.get_translation("yes"), do_reset),
+                (self.get_translation("no"), None),
+            ],
+            buttons_height=dp(60),
+            buttons_spacing=dp(20),
+            padding=[dp(30), dp(20), dp(30), dp(20)],
+            spacing=dp(20),
+        )
+
+
 class BrailleApp(App):
     current_language = StringProperty('en')
     current_difficulty = StringProperty('4')
@@ -3768,7 +4733,7 @@ class BrailleApp(App):
     use_stats = BooleanProperty(True)
     quick_streak = NumericProperty(0)
     quick_active = BooleanProperty(False)
-    quick_mode_weights = DictProperty({'easy': 40, 'medium': 30, 'hard': 30})
+    quick_mode_weights = DictProperty({'easy': 33, 'medium': 33, 'hard': 33})
     mirror_writing_mode = BooleanProperty(False)
     word_lists = DictProperty({})
     easy_mode_letters = BooleanProperty(True)
@@ -3779,6 +4744,10 @@ class BrailleApp(App):
     lessons_progress = DictProperty({})
     memo_mode_letters = BooleanProperty(True)
     memo_mode_digits = BooleanProperty(True)
+    quick_mode_easy = BooleanProperty(True)
+    quick_mode_medium = BooleanProperty(True)
+    quick_mode_hard = BooleanProperty(True)
+    LESSON_STARS_MAX = 5
 
     _screen_classes = {
         'menu': MenuScreen,
@@ -3799,6 +4768,7 @@ class BrailleApp(App):
     _loaded_screens = set()
 
     def build(self):
+        print(self.user_data_dir)
         self.is_mobile = platform in ('android', 'ios')
         self.braille_data = braille_data
         self.load_settings()
@@ -3814,23 +4784,11 @@ class BrailleApp(App):
         self.digits_lessons = self.build_lessons(list(digits_data.keys()), group_size=5)
         self.load_stats()
         self.load_word_list(self.current_language)
-        Clock.schedule_once(self.prewarm_reference, 0)
         Clock.schedule_once(self.prewarm_lessons, 0)
-
-    def prewarm_reference(self, dt):
-        lang = self.current_language
-        self._reference_cache = {
-            "lang": lang,
-            "letters": list(self.braille_data[lang].items()),
-            "digits": list(digits_data.items()),
-            "ns": chr(0x2800 | 0b111100),
-        }
 
     def prewarm_lessons(self, dt):
         lang = self.current_language
-        self.lessons_config.setdefault(lang, self.build_lessons(list(self.braille_data[lang].keys()), 4))
-        if not hasattr(self, "digits_lessons") or not self.digits_lessons:
-            self.digits_lessons = self.build_lessons(list(digits_data.keys()), 5)
+        self.lessons_config.setdefault(lang, self.build_lessons(list(self.braille_data[lang].keys()), 5))
 
     def _load_screen(self, sm, screen_name):
         if screen_name in self._loaded_screens:
@@ -3869,16 +4827,28 @@ class BrailleApp(App):
                     pass
 
     def choose_quick_mode(self):
-        modes = ['easy', 'medium', 'hard']
-        weights = [self.quick_mode_weights.get(m, 1) for m in modes]
+        enabled = []
+        if self.quick_mode_easy:
+            enabled.append("easy")
+        if self.quick_mode_medium:
+            enabled.append("medium")
+        if self.quick_mode_hard:
+            enabled.append("hard")
+
+        if not enabled:
+            enabled = ["easy"]
+
+        weights_map = self.quick_mode_weights or {}
+        weights = [weights_map.get(m, 1) for m in enabled]
+
         total = sum(weights)
         r = random.uniform(0, total)
         upto = 0
-        for m, w in zip(modes, weights):
+        for m, w in zip(enabled, weights):
             upto += w
             if upto >= r:
                 return m
-        return 'easy'
+        return enabled[0]
 
     def start_quick_review(self):
         self.quick_streak = 0
@@ -3961,11 +4931,17 @@ class BrailleApp(App):
         lessons, learned = [], []
         for i in range(0, len(items), group_size):
             chunk = items[i:i + group_size]
-            lessons += [{"mode": "study", "letters": chunk}]
-            if i: lessons += [{"mode": "practice", "letters": chunk}]
+
+            lessons.append({"mode": "study", "letters": chunk})
+
+            lessons.append({"mode": "practice", "letters": chunk})
+
             learned += chunk
-            lessons += [{"mode": "practice", "letters": learned[:]}]
-        lessons += [{"mode": "exam", "letters": items}]
+
+            if i > 0:
+                lessons.append({"mode": "review", "letters": learned[:]})
+
+        lessons.append({"mode": "exam", "letters": items})
         return lessons
 
     def get_lessons(self, lang, lesson_type='letters'):
@@ -3975,28 +4951,58 @@ class BrailleApp(App):
             self.lessons_config[lang] = self.build_lessons(list(self.braille_data[lang].keys()), 5)
         return self.lessons_config[lang]
 
-    def mark_lesson_completed(self, lang, idx, lesson_type):
-        progress_key = 'digits_common' if lesson_type == 'digits' else lang
-        prog = self.lessons_progress.setdefault(progress_key, {'completed_count': 0})
-        if idx + 1 > prog.get('completed_count', 0):
-            prog['completed_count'] = idx + 1
-            self.save_lessons_progress()
+    def mark_lesson_completed(self, lang, idx, lesson_type, stars: int = 1):
+        self.set_lesson_stars(lang, idx, lesson_type, stars)
 
     def load_lessons_progress(self):
         try:
             with open(self._path("lessons_progress.json"), "r", encoding="utf-8") as f:
-                self.lessons_progress = json.load(f)
+                data = json.load(f)
+            self.lessons_progress = data if isinstance(data, dict) else {}
         except (FileNotFoundError, json.JSONDecodeError):
             self.lessons_progress = {}
 
+        for k, v in list(self.lessons_progress.items()):
+            if not isinstance(v, dict):
+                self.lessons_progress[k] = {"completed_count": 0, "progress": {}}
+                continue
+            v.setdefault("completed_count", 0)
+            v.setdefault("progress", {})
+
+    def _progress_key(self, lang, lesson_type):
+        return "digits_common" if lesson_type == "digits" else lang
+
+    def get_lesson_stars(self, lang: str, lesson_index, lesson_type):
+        pk = self._progress_key(lang, lesson_type)
+        prog = self.lessons_progress.setdefault(pk, {"completed_count": 0, "progress": {}})
+        per = prog.setdefault("progress", {})
+        return int(per.get(f"lesson_{lesson_index}", 0))
+
+    def set_lesson_stars(self, lang, lesson_index, lesson_type, stars):
+        pk = self._progress_key(lang, lesson_type)
+        prog = self.lessons_progress.setdefault(pk, {"completed_count": 0, "progress": {}})
+        per = prog.setdefault("progress", {})
+
+        stars = max(0, min(int(stars), int(self.LESSON_STARS_MAX)))
+        key = f"lesson_{lesson_index}"
+        old = int(per.get(key, 0))
+        if stars > old:
+            per[key] = stars
+
+        cc = 0
+        while per.get(f"lesson_{cc}", 0) >= 1:
+            cc += 1
+        prog["completed_count"] = cc
+
+        self.save_lessons_progress()
+
     def save_lessons_progress(self):
-        with open(self._path("lessons_progress.json"), "w", encoding="utf-8") as f:
-            json.dump(self.lessons_progress, f, ensure_ascii=False, indent=2)
+        self._atomic_json_dump("lessons_progress.json", self.lessons_progress)
 
     def _path(self, filename):
         return os.path.join(self.user_data_dir, filename)
 
-    def load_word_list(self, lang: str) -> None:
+    def load_word_list(self, lang):
         path = resource_find(f"assets/words/{lang}.txt")
 
         if not path:
@@ -4012,6 +5018,22 @@ class BrailleApp(App):
             print(f"Error loading words for {lang} from {path}: {e}")
             self.word_lists[lang] = None
 
+    def _atomic_json_dump(self, filename, data):
+        path = self._path(filename)
+        tmp = path + ".tmp"
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+
+        os.replace(tmp, path)
+
     def load_settings(self):
         try:
             with open(self._path("settings.json"), "r", encoding="utf-8") as f:
@@ -4025,26 +5047,33 @@ class BrailleApp(App):
             self.easy_mode_digits = data.get('easy_mode_digits', True)
             self.medium_mode_letters = data.get('medium_mode_letters', True)
             self.medium_mode_digits = data.get('medium_mode_digits', True)
+            self.quick_mode_easy = data.get('quick_mode_easy', True)
+            self.quick_mode_medium = data.get('quick_mode_medium', True)
+            self.quick_mode_hard = data.get('quick_mode_hard', True)
             self.memo_mode_letters = data.get('memo_mode_letters', True)
             self.memo_mode_digits = data.get('memo_mode_digits', True)
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
     def save_settings(self):
-        with open(self._path("settings.json"), "w", encoding="utf-8") as f:
-            json.dump({
-                'language': self.current_language,
-                'difficulty': self.current_difficulty,
-                'quick_review_time': self.quick_review_time,
-                'use_stats': self.use_stats,
-                'mirror_writing_mode': self.mirror_writing_mode,
-                'easy_mode_letters': self.easy_mode_letters,
-                'easy_mode_digits': self.easy_mode_digits,
-                'medium_mode_letters': self.medium_mode_letters,
-                'medium_mode_digits': self.medium_mode_digits,
-                'memo_mode_letters': self.memo_mode_letters,
-                'memo_mode_digits': self.memo_mode_digits,
-            }, f, ensure_ascii=False, indent=2)
+        data = {
+            'language': self.current_language,
+            'difficulty': self.current_difficulty,
+            'quick_review_time': self.quick_review_time,
+            'use_stats': self.use_stats,
+            'mirror_writing_mode': self.mirror_writing_mode,
+            'easy_mode_letters': self.easy_mode_letters,
+            'easy_mode_digits': self.easy_mode_digits,
+            'medium_mode_letters': self.medium_mode_letters,
+            'medium_mode_digits': self.medium_mode_digits,
+            'quick_mode_easy': self.quick_mode_easy,
+            'quick_mode_medium': self.quick_mode_medium,
+            'quick_mode_hard': self.quick_mode_hard,
+            'memo_mode_letters': self.memo_mode_letters,
+            'memo_mode_digits': self.memo_mode_digits,
+        }
+        self._atomic_json_dump("settings.json", data)
+
         self.save_high_scores()
         self.save_stats()
 
@@ -4067,8 +5096,7 @@ class BrailleApp(App):
             }
 
     def save_high_scores(self):
-        with open(self._path("highscores.json"), "w", encoding="utf-8") as f:
-            json.dump(self.high_scores, f, ensure_ascii=False, indent=2)
+        self._atomic_json_dump("highscores.json", self.high_scores)
 
     def load_stats(self):
         try:
@@ -4085,8 +5113,7 @@ class BrailleApp(App):
     def save_stats(self):
         if not self.use_stats:
             return
-        with open(self._path("stats.json"), "w", encoding="utf-8") as f:
-            json.dump(self.stats, f, ensure_ascii=False, indent=2)
+        self._atomic_json_dump("stats.json", self.stats)
 
     def on_start(self):
         Window.bind(on_keyboard=self.on_back_btn)
