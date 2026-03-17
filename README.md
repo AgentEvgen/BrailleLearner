@@ -40,3 +40,10 @@
 ```bash
 pip install kivy
 python "Braille learner.py"
+```
+
+## Скриншоты
+
+| <img src="./Screenshots/1.jpg" alt="1" /> | <img src="./Screenshots/2.jpg" alt="2" /> | <img src="./Screenshots/3.jpg" alt="3" /> |
+| ----------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| <img src="./Screenshots/4.jpg" alt="4" /> | <img src="./Screenshots/5.jpg" alt="5" /> | <img src="./Screenshots/6.jpg" alt="6" /> |
