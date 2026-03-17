@@ -39,7 +39,7 @@
 ### Установка и запуск
 ```bash
 pip install kivy
-python "Braille learner.py"
+python "main.py"
 ```
 
 ## Скриншоты
