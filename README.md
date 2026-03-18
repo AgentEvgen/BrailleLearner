@@ -36,11 +36,23 @@
 - [`kivy`](https://kivy.org/doc/stable/gettingstarted/installation.html)  
 - Папка **assets** *(включенна в репозиторий)*
 
-### Установка и запуск
+### Сборка
+Используйте файл **setup.py**, либо проделайте эти шаги вручную:
 ```bash
-pip install kivy
-python "main.py"
+# Скачайте данный проект
+git clone https://github.com/AgentEvgen/BrailleLearner.git
+cd BrailleLearner
+
+# Установите зависимости
+pip install kivy, buildozer
+
+# Переносим файлы из подпапки buildozer в корень проекта
+mv buildozer/* .
+
+# Запустите конвертацию
+buildozer -v android debug
 ```
+
 
 ## Скриншоты
 
