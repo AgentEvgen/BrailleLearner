@@ -37,16 +37,24 @@
 - Папка **assets** *(включенна в репозиторий)*
 
 ### Сборка
-Используйте файл **setup.py**, либо проделайте эти шаги вручную:
+Используйте файл **setup.sh**, либо проделайте эти шаги вручную:
 ```bash
+# Скачайте необходимые зависимости
+sudo apt update
+sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev python3-dev python3-pip python3-setuptools python3-venv openjdk-17-jdk
+
 # Скачайте данный проект
 git clone https://github.com/AgentEvgen/BrailleLearner.git
 cd BrailleLearner
 
-# Установите зависимости
-pip install kivy, buildozer
+# Создаете и активируйте venv
+python3 -m venv venv
+source venv/bin/activate
 
-# Переносим файлы из подпапки buildozer в корень проекта
+# Установите зависимости
+pip install Cython kivy buildozer
+
+# Перенесите файлы из подпапки buildozer в корень проекта
 mv buildozer/* .
 
 # Запустите конвертацию и ждите
