@@ -64,6 +64,6 @@ buildozer -v android debug
 
 ## Скриншоты
 
-| <img src="./Screenshots/1.jpg" alt="1" /> | <img src="./Screenshots/2.jpg" alt="2" /> | <img src="./Screenshots/3.jpg" alt="3" /> |
+| <img src="./Screenshots/1.jpg" alt="Средний режим" /> | <img src="./Screenshots/2.jpg" alt="Сложный режим" /> | <img src="./Screenshots/3.jpg" alt="Справочник" /> |
 | ----------------------------------------- | ----------------------------------------- | ----------------------------------------- |
-| <img src="./Screenshots/4.jpg" alt="4" /> | <img src="./Screenshots/5.jpg" alt="5" /> | <img src="./Screenshots/6.jpg" alt="6" /> |
+| <img src="./Screenshots/4.jpg" alt="Переводчик" /> | <img src="./Screenshots/5.jpg" alt="Результаты теста по уроку" /> | <img src="./Screenshots/6.jpg" alt="Игра в МЕМО" /> |
