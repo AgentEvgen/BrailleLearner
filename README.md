@@ -49,7 +49,7 @@ pip install kivy, buildozer
 # Переносим файлы из подпапки buildozer в корень проекта
 mv buildozer/* .
 
-# Запустите конвертацию
+# Запустите конвертацию и ждите
 buildozer -v android debug
 ```
 
