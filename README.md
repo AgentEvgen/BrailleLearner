@@ -52,7 +52,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Установите зависимости
-pip install Cython kivy buildozer
+pip install Cython==0.29.33 kivy buildozer
 
 # Перенесите файлы из подпапки buildozer в корень проекта
 mv buildozer/* .
