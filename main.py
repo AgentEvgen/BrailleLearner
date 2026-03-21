@@ -4185,11 +4185,8 @@ class ReferenceScreen(BaseScreen):
         for d, dots in digits_items:
             braille_char = ns + self.get_braille_char(dots)
 
-            if self.app.use_stats:
-                st = self.app.stats[lang].get(d, {"correct": 0, "wrong": 0})
-                stats_text = stats_fmt.format(st["correct"], st["wrong"])
-            else:
-                stats_text = ""
+            st = self.app.stats[lang].get(d, {"correct": 0, "wrong": 0})
+            stats_text = stats_fmt.format(st["correct"], st["wrong"])
 
             data.append({
                 "viewclass": "ReferenceRow",
@@ -4202,8 +4199,6 @@ class ReferenceScreen(BaseScreen):
         self.ids.rv.data = data
 
     def _refresh_stats_in_rv(self):
-        if not self.app.use_stats:
-            return
 
         lang = self.app.current_language
         fmt = self.get_translation('stats_label')
