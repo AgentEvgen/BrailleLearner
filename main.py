@@ -913,7 +913,7 @@ Builder.load_string('''
                         Spinner:
                             id: lang_spinner
                             text: root.current_lang
-                            values: root.languages.values()
+                            values: root.language_values
                             size_hint_x: None
                             width: dp(150) if app.is_mobile else dp(200)
                             on_text: root.update_settings('language', self.text)
@@ -1513,47 +1513,6 @@ Builder.load_string('''
             on_press: app.switch_screen('menu')
 ''')
 
-braille_data = {
-    'en': {
-        'A': [1, 0, 0, 0, 0, 0], 'B': [1, 1, 0, 0, 0, 0], 'C': [1, 0, 0, 1, 0, 0],
-        'D': [1, 0, 0, 1, 1, 0], 'E': [1, 0, 0, 0, 1, 0], 'F': [1, 1, 0, 1, 0, 0],
-        'G': [1, 1, 0, 1, 1, 0], 'H': [1, 1, 0, 0, 1, 0], 'I': [0, 1, 0, 1, 0, 0],
-        'J': [0, 1, 0, 1, 1, 0], 'K': [1, 0, 1, 0, 0, 0], 'L': [1, 1, 1, 0, 0, 0],
-        'M': [1, 0, 1, 1, 0, 0], 'N': [1, 0, 1, 1, 1, 0], 'O': [1, 0, 1, 0, 1, 0],
-        'P': [1, 1, 1, 1, 0, 0], 'Q': [1, 1, 1, 1, 1, 0], 'R': [1, 1, 1, 0, 1, 0],
-        'S': [0, 1, 1, 1, 0, 0], 'T': [0, 1, 1, 1, 1, 0], 'U': [1, 0, 1, 0, 0, 1],
-        'V': [1, 1, 1, 0, 0, 1], 'W': [0, 1, 0, 1, 1, 1], 'X': [1, 0, 1, 1, 0, 1],
-        'Y': [1, 0, 1, 1, 1, 1], 'Z': [1, 0, 1, 0, 1, 1]
-    },
-    'ru': {
-        'А': [1, 0, 0, 0, 0, 0], 'Б': [1, 1, 0, 0, 0, 0], 'В': [0, 1, 0, 1, 1, 1],
-        'Г': [1, 1, 0, 1, 1, 0], 'Д': [1, 0, 0, 1, 1, 0], 'Е': [1, 0, 0, 0, 1, 0],
-        'Ё': [1, 0, 0, 0, 0, 1], 'Ж': [0, 1, 0, 1, 1, 0], 'З': [1, 0, 1, 0, 1, 1],
-        'И': [0, 1, 0, 1, 0, 0], 'Й': [1, 1, 1, 1, 0, 1], 'К': [1, 0, 1, 0, 0, 0],
-        'Л': [1, 1, 1, 0, 0, 0], 'М': [1, 0, 1, 1, 0, 0], 'Н': [1, 0, 1, 1, 1, 0],
-        'О': [1, 0, 1, 0, 1, 0], 'П': [1, 1, 1, 1, 0, 0], 'Р': [1, 1, 1, 0, 1, 0],
-        'С': [0, 1, 1, 1, 0, 0], 'Т': [0, 1, 1, 1, 1, 0], 'У': [1, 0, 1, 0, 0, 1],
-        'Ф': [1, 1, 0, 1, 0, 0], 'Х': [1, 1, 0, 0, 1, 0], 'Ц': [1, 0, 0, 1, 0, 0],
-        'Ч': [1, 1, 1, 1, 1, 0], 'Ш': [1, 0, 0, 0, 1, 1], 'Щ': [1, 0, 1, 1, 0, 1],
-        'Ъ': [1, 1, 1, 0, 1, 1], 'Ы': [0, 1, 1, 1, 0, 1], 'Ь': [0, 1, 1, 1, 1, 1],
-        'Э': [0, 1, 0, 1, 0, 1], 'Ю': [1, 1, 0, 0, 1, 1], 'Я': [1, 1, 0, 1, 0, 1]
-    },
-    'dru': {
-        'А': [1, 0, 0, 0, 0, 0], 'Б': [1, 1, 0, 0, 0, 0], 'В': [0, 1, 0, 1, 1, 1],
-        'Г': [1, 1, 0, 1, 1, 0], 'Д': [1, 0, 0, 1, 1, 0], 'Е': [1, 0, 0, 0, 1, 0],
-        'Ж': [0, 1, 0, 1, 1, 0], 'И': [0, 1, 0, 1, 0, 0], 'I': [1, 0, 1, 1, 1, 1],
-        'К': [1, 0, 1, 0, 0, 0], 'Л': [1, 1, 1, 0, 0, 0], 'М': [1, 0, 1, 1, 0, 0],
-        'Н': [1, 0, 1, 1, 1, 0], 'О': [1, 0, 1, 0, 1, 0], 'П': [1, 1, 1, 1, 0, 0],
-        'Р': [1, 1, 1, 0, 1, 0], 'С': [0, 1, 1, 1, 0, 0], 'Т': [0, 1, 1, 1, 1, 0],
-        'У': [1, 0, 1, 0, 0, 1], 'Ф': [1, 1, 0, 1, 0, 0], 'Х': [1, 1, 0, 0, 1, 0],
-        'Ц': [1, 0, 0, 1, 0, 0], 'Ч': [1, 1, 1, 1, 1, 0], 'Ш': [1, 0, 0, 0, 1, 1],
-        'Щ': [1, 0, 1, 1, 0, 1], 'Ъ': [1, 1, 1, 0, 1, 1], 'Ѣ': [0, 0, 1, 1, 1, 0],
-        'Ы': [0, 1, 1, 1, 0, 1], 'Ь': [0, 1, 1, 1, 1, 1], 'Э': [0, 1, 0, 1, 0, 1],
-        'Ю': [1, 1, 0, 0, 1, 1], 'Я': [1, 1, 0, 1, 0, 1], 'Ѳ': [1, 1, 1, 0, 0, 1],
-        'Ѵ': [1, 0, 1, 0, 1, 1]
-    }
-}
-
 number_sign_dots = [0, 0, 1, 1, 1, 1]  # ⠼
 digits_data = {
     '1': [1, 0, 0, 0, 0, 0], '2': [1, 1, 0, 0, 0, 0], '3': [1, 0, 0, 1, 0, 0],
@@ -1561,159 +1520,98 @@ digits_data = {
     '7': [1, 1, 0, 1, 1, 0], '8': [1, 1, 0, 0, 1, 0], '9': [0, 1, 0, 1, 0, 0],
     '0': [0, 1, 0, 1, 1, 0]}
 
-translations = {
-    'en': {
-        'menu_title': 'Main Menu', 'practice': 'Practice',
-        'settings_title': 'Settings', 'language_label': 'Language:', 'back_btn': 'Back',
-        'streak': 'Current streak: {}\nRecord: {}', 'reference_title': 'Reference',
-        'difficulty_label': 'Difficulty:', 'difficulty_2': '2 options', 'difficulty_4': '4 options',
-        'difficulty_6': '6 options', 'difficulty_8': '8 options', 'difficulty_10': '10 options',
-        'translator_title': 'Translator', 'input_hint': 'Enter text here',
-        'training_title': 'Training',
-        'practice_levels_title': 'Practice Levels', 'easy_level': 'Easy Level', 'medium_level': 'Medium Level',
-        'hard_level': 'Hard Level', 'quick_review': 'Quick Review',
-        'coming_soon': 'Coming Soon!', 'time_label': 'Time per answer (sec):', 'time_hint': 'Enter time',
-        'use_stats': 'Use Statistics', 'reset_stats_btn': 'Reset Statistics', 'reset_stats_title': 'Reset Statistics',
-        'reset_stats_text': 'Are you sure you want to reset all statistics?',
-        'yes': 'Yes', 'no': 'No', 'stats_label': 'Correct: {} \n Wrong: {}', "confirm_btn": "Confirm",
-        "hint_btn": "Hint", 'input_braille_btn': 'Input Braille', 'delete_btn': 'Delete',
-        'no_errors_btn': 'No errors', 'general_settings_header': 'General Settings',
-        'easy_mode_header': 'Easy Mode Settings',
-        'quick_review_header': 'Quick Review Settings',
-        'medium_mode_header': 'Medium Mode Settings',
-        'mirror_mode_label': 'Mirror Writing',
-        'copy': 'Copy',
-        'include_letters': 'Include letters',
-        'include_digits': 'Include digits',
-        'section_letters': 'Letters',
-        'section_digits': 'Digits',
-        'Test': 'Test',
-        'lessons_title': 'Lessons', 'lesson': 'Lesson', 'letters_label': 'Symbols: {}', 'start': 'Start',
-        'retry': 'Retry', 'locked': 'Locked', 'complete_lesson': 'Complete lesson',
-        'view_all_letters': 'View all letters', 'lesson_test_title': 'Lesson Test',
-        'question': 'Question {}/{}', 'test_passed': 'Test passed!', 'test_failed': 'Test failed',
-        'ok': 'OK', 'completed': 'Completed', 'available': 'Available',
-        'memory_game_title': 'MEMO',
-        'moves_label': 'Moves: {}',
-        'play_again': 'Play Again',
-        'exit_menu': 'Menu',
-        'you_won': 'You Won!',
-        'word_search_title': 'Word Search',
-        'word_search_words_title': 'Find words:',
-        'word_search_status': 'Found: {}/{}',
-        'word_search_win_text': 'All words found.',
-        'games': 'Games',
-        'review': 'Review',
-        'reset_lessons_btn': 'Reset Lessons Progress',
-        'reset_lessons_title': 'Reset Lessons Progress',
-        'reset_lessons_text': 'Are you sure you want to reset lessons progress and stars?',
-        'cut_popup': 'Cut',
-        'paste_popup': 'Paste',
-        'select_all_popup': 'Select All',
-    },
-    'ru': {
-        'menu_title': 'Главное меню', 'practice': 'Практика',
-        'settings_title': 'Настройки', 'language_label': 'Язык:', 'back_btn': 'Назад',
-        'streak': 'Текущая серия: {}\nРекорд: {}', 'reference_title': 'Справочник',
-        'difficulty_label': 'Сложность:', 'difficulty_2': '2 варианта', 'difficulty_4': '4 варианта',
-        'difficulty_6': '6 вариантов', 'difficulty_8': '8 вариантов', 'difficulty_10': '10 вариантов',
-        'translator_title': 'Переводчик', 'input_hint': 'Введите текст',
-        'training_title': 'Обучение',
-        'practice_levels_title': 'Уровни практики', 'easy_level': 'Простой уровень', 'medium_level': 'Средний уровень',
-        'hard_level': 'Сложный уровень', 'quick_review': 'Быстрое повторение',
-        'coming_soon': 'Скоро будет!', 'time_label': 'Время на ответ (сек):', 'time_hint': 'Введите время',
-        'use_stats': 'Использовать статистику', 'reset_stats_btn': 'Сбросить статистику',
-        'reset_stats_title': 'Сброс статистики', 'reset_stats_text': 'Вы уверены, что хотите сбросить всю статистику?',
-        'yes': 'Да', 'no': 'Нет', 'stats_label': 'Правильно: {} \n Ошибок: {}', "confirm_btn": "Подтвердить",
-        "hint_btn": "Подсказка", 'input_braille_btn': 'Ввод Брайля', 'delete_btn': 'Удалить',
-        'no_errors_btn': 'Ошибок нет',
-        'general_settings_header': 'Общие настройки',
-        'easy_mode_header': 'Настройки простого режима',
-        'quick_review_header': 'Настройки быстрого повторения',
-        'medium_mode_header': 'Настройки среднего режима',
-        'mirror_mode_label': 'Зеркальное письмо',
-        'include_letters': 'Включать буквы',
-        'include_digits': 'Включать цифры',
-        'section_letters': 'Буквы',
-        'section_digits': 'Цифры',
-        'Test': 'Зачёт',
-        'lessons_title': 'Уроки', 'lesson': 'Урок', 'letters_label': 'Символы: {}', 'start': 'Начать',
-        'retry': 'Повторить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урок',
-        'view_all_letters': 'Просмотрите все буквы', 'lesson_test_title': 'Тест по уроку',
-        'question': 'Вопрос {}/{}', 'test_passed': 'Тест пройден!', 'test_failed': 'Тест не пройден',
-        'ok': 'Ок', 'completed': 'Пройдено', 'available': 'Доступно',
-        'memory_game_title': 'МЕМО',
-        'moves_label': 'Ходы: {}',
-        'play_again': 'Играть снова',
-        'exit_menu': 'Меню',
-        'you_won': 'Победа!',
-        'word_search_title': 'Филворд',
-        'word_search_words_title': 'Найди слова:',
-        'word_search_status': 'Найдено: {}/{}',
-        'word_search_win_text': 'Все слова найдены.',
-        'games': 'Игры',
-        'review': 'Повторение',
-        'reset_lessons_btn': 'Сбросить прогресс обучения',
-        'reset_lessons_title': 'Сброс прогресса обучения',
-        'reset_lessons_text': 'Вы уверены, что хотите сбросить прогресс уроков и звёзды?',
-        'copy': 'Копировать',
-        'cut_popup': 'Вырезать',
-        'paste_popup': 'Вставить',
-        'select_all_popup': 'Выбрать всё',
-    },
-    'dru': {
-        'menu_title': 'Главное меню', 'practice': 'Практика',
-        'settings_title': 'Настройки', 'language_label': 'Языкъ:', 'back_btn': 'Назадъ',
-        'streak': 'Текущая серія: {}\nРекордъ: {}', 'reference_title': 'Справочникъ',
-        'difficulty_label': 'Сложность:', 'difficulty_2': '2 варіанта', 'difficulty_4': '4 варіанта',
-        'difficulty_6': '6 варіантовъ', 'difficulty_8': '8 варіантовъ', 'difficulty_10': '10 варіантовъ',
-        'translator_title': 'Переводчикъ', 'input_hint': 'Введите текстъ',
-        'training_title': 'Обученіе',
-        'practice_levels_title': 'Уровни практики', 'easy_level': 'Простой уровень', 'medium_level': 'Средній уровень',
-        'hard_level': 'Сложный уровень', 'quick_review': 'Быстрое повтореніе',
-        'coming_soon': 'Скоро будетъ!', 'time_label': 'Время на отвѣтъ (сѣкъ):', 'time_hint': 'Введите время',
-        'use_stats': 'Использовать статистику', 'reset_stats_btn': 'Сбросить статистику',
-        'reset_stats_title': 'Сбросъ статистики', 'reset_stats_text': 'Вы увѣрены, что хотите сбросить всю статистику?',
-        'yes': 'Да', 'no': 'Нѣтъ', 'stats_label': 'Правильно: {} \n Ошибокъ: {}', "confirm_btn": "Подтвердить",
-        "hint_btn": "Подсказка", 'input_braille_btn': 'Вводъ Брайля', 'delete_btn': 'Удалить',
-        'no_errors_btn': 'Ошибокъ нѣтъ',
-        'general_settings_header': 'Общіе настройки',
-        'easy_mode_header': 'Настройки простого режима',
-        'quick_review_header': 'Настройки быстраго повторенія',
-        'medium_mode_header': 'Настройки средняго режима',
-        'mirror_mode_label': 'Зеркальное письмо',
-        'copy': 'Копировать',
-        'include_letters': 'Включать буквы',
-        'include_digits': 'Включать цифры',
-        'section_letters': 'Буквы',
-        'section_digits': 'Цифры',
-        'Test': 'Зачетъ',
-        'lessons_title': 'Уроки', 'lesson': 'Урокъ', 'letters_label': 'Символы: {}', 'start': 'Начать',
-        'retry': 'Повторить', 'locked': 'Заблокировано', 'complete_lesson': 'Завершить урокъ',
-        'view_all_letters': 'Просмотрите всё буквы', 'lesson_test_title': 'Тестъ по уроку',
-        'question': 'Вопросъ {}/{}', 'test_passed': 'Тестъ пройденъ!', 'test_failed': 'Тестъ не пройденъ',
-        'ok': 'Окъ', 'completed': 'Пройдено', 'available': 'Доступно',
-        'memory_game_title': 'МЕМО',
-        'moves_label': 'Ходы: {}',
-        'play_again': 'Играть снова',
-        'exit_menu': 'Меню',
-        'you_won': 'Побѣда!',
-        'word_search_title': 'Филвордъ',
-        'word_search_words_title': 'Найди слова:',
-        'word_search_status': 'Найдено: {}/{}',
-        'word_search_win_text': 'Всё слова найдены.',
-        'games': 'Игры',
-        'review': 'Повтореніе',
-        'reset_lessons_btn': 'Сбросить прогрессъ обученія',
-        'reset_lessons_title': 'Сбросъ прогресса обученія',
-        'reset_lessons_text': 'Вы увѣрены, что хотите сбросить прогрессъ уроковъ и звѣзды?',
-        'cut_popup': 'Вырѣзать',
-        'paste_popup': 'Вставить',
-        'select_all_popup': 'Выбрать всё',
-    }
-}
+def load_translations():
+    translations_dir = resource_find("assets/translations") or os.path.join(
+        os.path.dirname(__file__), "assets", "translations"
+    )
 
-LANGUAGES = {'en': 'English', 'ru': 'Русский', 'dru': 'Дореволюціонный русскій'}
+    loaded_translations = {}
+    loaded_languages = {}
+
+    if not os.path.isdir(translations_dir):
+        print(f"Translations directory not found: {translations_dir}")
+        return {"en": {}}, {"en": "English"}
+
+    for filename in os.listdir(translations_dir):
+        if not filename.endswith(".json"):
+            continue
+
+        lang_code = os.path.splitext(filename)[0]
+        path = os.path.join(translations_dir, filename)
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if isinstance(data, dict) and "strings" in data:
+                loaded_translations[lang_code] = data.get("strings", {})
+                loaded_languages[lang_code] = data.get("language_name", lang_code)
+            elif isinstance(data, dict):
+                loaded_translations[lang_code] = data
+                loaded_languages[lang_code] = lang_code
+
+        except Exception as e:
+            print(f"Error loading translation file {path}: {e}")
+
+    valid_codes = [code for code in loaded_translations if code in braille_data]
+    loaded_translations = {code: loaded_translations[code] for code in valid_codes}
+    loaded_languages = {code: loaded_languages[code] for code in valid_codes}
+
+    if "en" not in loaded_translations:
+        loaded_translations["en"] = {}
+        loaded_languages["en"] = "English"
+
+    return loaded_translations, loaded_languages
+
+def load_braille_data():
+    braille_dir = resource_find("assets/braille") or os.path.join(
+        os.path.dirname(__file__), "assets", "braille"
+    )
+
+    loaded = {}
+
+    if not os.path.isdir(braille_dir):
+        print(f"Braille directory not found: {braille_dir}")
+        return loaded
+
+    for filename in os.listdir(braille_dir):
+        if not filename.endswith(".json"):
+            continue
+
+        lang_code = os.path.splitext(filename)[0]
+        path = os.path.join(braille_dir, filename)
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if not isinstance(data, dict):
+                print(f"Invalid braille file format: {path}")
+                continue
+
+            valid_lang_map = {}
+            for char, dots in data.items():
+                if (
+                    isinstance(char, str)
+                    and len(char) >= 1
+                    and isinstance(dots, list)
+                    and len(dots) == 6
+                    and all(x in (0, 1) for x in dots)
+                ):
+                    valid_lang_map[char] = dots
+                else:
+                    print(f"Invalid braille entry in {path}: {char} -> {dots}")
+
+            if valid_lang_map:
+                loaded[lang_code] = valid_lang_map
+
+        except Exception as e:
+            print(f"Error loading braille file {path}: {e}")
+
+    return loaded
+
+braille_data = load_braille_data()
+translations, LANGUAGES = load_translations()
 
 
 # _original_bubble_button_init = BubbleButton.__init__
@@ -1794,7 +1692,9 @@ class BaseScreen(Screen):
 
     def get_translation(self, key):
         lang = self.app.current_language if hasattr(self.app, 'current_language') else 'en'
-        return translations.get(lang, translations['en']).get(key, key)
+        lang_dict = translations.get(lang, {})
+        en_dict = translations.get('en', {})
+        return lang_dict.get(key, en_dict.get(key, key))
 
     def load_braille_data(self):
         self.braille_data = self.app.braille_data[self.app.current_language]
@@ -2072,8 +1972,9 @@ class MenuScreen(BaseScreen):
         if random.random() < 0.01:
             braille_title = ''
             for char in original_title.upper():
-                if char in braille_data[self.app.current_language]:
-                    dots = braille_data[self.app.current_language][char]
+                lang_map = self.app.braille_data.get(self.app.current_language, {})
+                if char in lang_map:
+                    dots = lang_map[char]
                     braille_title += self.get_braille_char(dots)
                 else:
                     braille_title += ' '
@@ -4543,7 +4444,7 @@ class SettingsScreen(BaseScreen):
     difficulty_label = StringProperty()
     current_lang = StringProperty()
     current_difficulty_str = StringProperty()
-    languages = DictProperty(LANGUAGES)
+    language_values = ListProperty([])
     difficulty_values = ListProperty()
     time_label = StringProperty()
     time_hint = StringProperty()
@@ -4565,6 +4466,8 @@ class SettingsScreen(BaseScreen):
     def update_lang(self):
         super().update_lang()
         lang = self.app.current_language
+        self.language_values = list(LANGUAGES.values())
+        self.current_lang = LANGUAGES.get(lang, 'English')
         self.settings_title = self.get_translation('settings_title')
         self.language_label = self.get_translation('language_label')
         self.difficulty_label = self.get_translation('difficulty_label')
@@ -4729,7 +4632,7 @@ class BrailleApp(App):
     current_difficulty = StringProperty('4')
     quick_review_time = NumericProperty(5)
     is_mobile = BooleanProperty(False)
-    stats = DictProperty({'en': {}, 'ru': {}, 'dru': {}})
+    stats = DictProperty({})
     use_stats = BooleanProperty(True)
     quick_streak = NumericProperty(0)
     quick_active = BooleanProperty(False)
@@ -4768,6 +4671,11 @@ class BrailleApp(App):
     _loaded_screens = set()
 
     def build(self):
+        global braille_data, translations, LANGUAGES
+
+        braille_data = load_braille_data()
+        translations, LANGUAGES = load_translations()
+
         print(self.user_data_dir)
         self.is_mobile = platform in ('android', 'ios')
         self.braille_data = braille_data
@@ -4825,6 +4733,17 @@ class BrailleApp(App):
                         screen.update_lang()
                 except:
                     pass
+
+    def get_available_languages(self):
+        return list(LANGUAGES.keys())
+
+    def default_high_score_entry(self):
+        return {
+            'practice': 0,
+            'medium_practice': 0,
+            'hard_practice': 0,
+            'quick': 0
+        }
 
     def choose_quick_mode(self):
         enabled = []
@@ -5055,6 +4974,9 @@ class BrailleApp(App):
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
+        if self.current_language not in braille_data:
+            self.current_language = 'en'
+
     def save_settings(self):
         data = {
             'language': self.current_language,
@@ -5078,22 +5000,21 @@ class BrailleApp(App):
         self.save_stats()
 
     def load_high_scores(self):
+        langs = self.get_available_languages()
+
         try:
             with open(self._path("highscores.json"), "r", encoding="utf-8") as f:
                 data = json.load(f)
-            for lang in ['en', 'ru', 'dru']:
-                if not isinstance(data.get(lang), dict):
-                    data[lang] = {}
-                data[lang].setdefault('practice', 0)
-                data[lang].setdefault('medium_practice', 0)
-                data[lang].setdefault('hard_practice', 0)
-                data[lang].setdefault('quick', 0)
-            self.high_scores = data
         except (FileNotFoundError, json.JSONDecodeError):
-            self.high_scores = {
-                lang: {'practice': 0, 'medium_practice': 0, 'hard_practice': 0, 'quick': 0}
-                for lang in ['en', 'ru', 'dru']
-            }
+            data = {}
+
+        for lang in langs:
+            if not isinstance(data.get(lang), dict):
+                data[lang] = {}
+            for key, value in self.default_high_score_entry().items():
+                data[lang].setdefault(key, value)
+
+        self.high_scores = data
 
     def save_high_scores(self):
         self._atomic_json_dump("highscores.json", self.high_scores)
@@ -5105,7 +5026,7 @@ class BrailleApp(App):
         except (FileNotFoundError, json.JSONDecodeError):
             data = {}
 
-        for lang in ("en", "ru", "dru"):
+        for lang in self.get_available_languages():
             data.setdefault(lang, {})
 
         self.stats = data
