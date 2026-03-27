@@ -3002,6 +3002,7 @@ class EasyWordsPracticeScreen(BaseScreen):
     time_left = NumericProperty(5)
     timer_active = BooleanProperty(False)
     quick_review_mode = BooleanProperty(False)
+    OPTIONS_COUNT = 4
 
     def __init__(self, **kwargs):
         self.current_streak = 0
@@ -3029,21 +3030,20 @@ class EasyWordsPracticeScreen(BaseScreen):
 
     def _ensure_answer_buttons(self):
         grid = self.ids.answers_grid
-        max_n = 4
-
-        if len(self._answer_buttons) == max_n:
+        if len(self._answer_buttons) == self.OPTIONS_COUNT:
             return
 
-        for _ in range(max_n):
+        for _ in range(self.OPTIONS_COUNT):
             btn = Button(size_hint=(1, None), on_press=self.check_answer)
             btn.disabled_color = (1, 1, 1, 1)
             btn.background_disabled_normal = btn.background_normal
             btn.background_disabled_down = btn.background_down
             btn.answer_word = None
-            btn.answer_is_braille = False
             btn.halign = 'center'
             btn.valign = 'middle'
-            btn.bind(size=lambda inst, value: setattr(inst, 'text_size', (inst.width - dp(20), inst.height - dp(10))))
+            btn.bind(size=lambda inst, value: setattr(
+                inst, 'text_size', (inst.width - dp(20), inst.height - dp(10))
+            ))
             grid.add_widget(btn)
             self._answer_buttons.append(btn)
 
@@ -3098,23 +3098,28 @@ class EasyWordsPracticeScreen(BaseScreen):
 
     def _build_answers(self):
         pool = self._get_word_pool()
-        k = int(self.app.current_difficulty)
-        k = max(2, min(k, len(pool)))
-
         answers = [self.current_word]
+
         distractors = [w for w in pool if w != self.current_word]
 
-        same_len = [w for w in distractors if abs(len(w) - len(self.current_word)) <= 1]
-        other = [w for w in distractors if w not in same_len]
+        similar = [w for w in distractors if abs(len(w) - len(self.current_word)) <= 1]
+        other = [w for w in distractors if w not in similar]
 
-        random.shuffle(same_len)
+        random.shuffle(similar)
         random.shuffle(other)
 
-        answers.extend(same_len[:k - 1])
-        if len(answers) < k:
-            answers.extend(other[:k - len(answers)])
+        answers.extend(similar[:self.OPTIONS_COUNT - 1])
 
-        answers = answers[:k]
+        if len(answers) < self.OPTIONS_COUNT:
+            answers.extend(other[:self.OPTIONS_COUNT - len(answers)])
+
+        answers = answers[:self.OPTIONS_COUNT]
+
+        remaining = [w for w in pool if w not in answers]
+        random.shuffle(remaining)
+        while len(answers) < self.OPTIONS_COUNT and remaining:
+            answers.append(remaining.pop())
+
         random.shuffle(answers)
         return answers
 
@@ -3142,55 +3147,42 @@ class EasyWordsPracticeScreen(BaseScreen):
             self.start_timer()
 
     def _update_grid(self, *args):
-        grid = self.ids.answers_grid
-        self._ensure_answer_buttons()
-
         if not self.current_word:
             return
 
         answers = self._build_answers()
-
-        horizontal_padding = dp(20)
-        spacing = dp(5)
-        num_options = len(answers)
+        grid = self.ids.answers_grid
 
         grid.cols = 1
-        grid.padding = [horizontal_padding, 0, horizontal_padding, 0]
-        grid.spacing = spacing
+        grid.spacing = dp(5)
+        grid.padding = [dp(20), 0, dp(20), 0]
 
         available_height = grid.height
-        final_row_height = (available_height - spacing * (num_options - 1)) / max(1, num_options)
-        final_row_height = max(dp(60), min(final_row_height, dp(110)))
+        row_h = (available_height - dp(5) * (self.OPTIONS_COUNT - 1)) / self.OPTIONS_COUNT
+        row_h = max(dp(60), min(row_h, dp(110)))
 
-        grid.row_default_height = final_row_height
+        grid.row_default_height = row_h
         grid.row_force_default = True
 
         self.correct_button = None
 
         for i, btn in enumerate(self._answer_buttons):
-            if i < num_options:
+            if i < len(answers):
                 ans = answers[i]
                 btn.opacity = 1
                 btn.disabled = False
-                btn.height = final_row_height
+                btn.height = row_h
                 btn.answer_word = ans
                 btn.background_color = (1, 1, 1, 1)
-                btn.text_size = (0, 0)
 
                 if self.invert_mode:
                     btn.text = self._word_to_braille(ans)
                     btn.font_name = 'BrailleFont'
-                    btn.font_size = min(dp(30), final_row_height * 0.42)
-                    btn.answer_is_braille = True
+                    btn.font_size = min(dp(30), row_h * 0.42)
                 else:
                     btn.text = ans
                     btn.font_name = 'Roboto'
-                    btn.font_size = min(dp(22), final_row_height * 0.28)
-                    btn.answer_is_braille = False
-
-                btn.text_size = (btn.width - dp(20), btn.height - dp(10))
-                btn.halign = 'center'
-                btn.valign = 'middle'
+                    btn.font_size = min(dp(22), row_h * 0.28)
 
                 if ans == self.current_word:
                     self.correct_button = btn
