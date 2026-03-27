@@ -3029,7 +3029,7 @@ class EasyWordsPracticeScreen(BaseScreen):
 
     def _ensure_answer_buttons(self):
         grid = self.ids.answers_grid
-        max_n = 10
+        max_n = 4
 
         if len(self._answer_buttons) == max_n:
             return
