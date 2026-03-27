@@ -1135,7 +1135,21 @@ Builder.load_string('''
                             size_hint_x: None
                             width: dp(60)
                             on_active: root.toggle_quick_easy(self.active)
-
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(50)
+                        spacing: dp(10)
+                        Label:
+                            text: root.quick_mode_easy_words_label
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                        Switch:
+                            id: quick_easy_words_sw
+                            active: app.quick_mode_easy_words
+                            size_hint_x: None
+                            width: dp(60)
+                            on_active: root.toggle_quick_easy_words(self.active)
                     BoxLayout:
                         size_hint_y: None
                         height: dp(50)
@@ -4795,6 +4809,7 @@ class SettingsScreen(BaseScreen):
     medium_mode_header = StringProperty()
     mirror_mode_label = StringProperty()
     quick_mode_easy_label = StringProperty()
+    quick_mode_easy_words_label = StringProperty()
     quick_mode_medium_label = StringProperty()
     quick_mode_hard_label = StringProperty()
     include_letters = StringProperty()
@@ -4823,6 +4838,7 @@ class SettingsScreen(BaseScreen):
         self.include_digits = self.get_translation('include_digits')
         self.memory_game_title = self.get_translation('memory_game_title')
         self.quick_mode_easy_label = self.get_translation('easy_level')
+        self.quick_mode_easy_words_label = self.get_translation('easy_words_level')
         self.quick_mode_medium_label = self.get_translation('medium_level')
         self.quick_mode_hard_label = self.get_translation('hard_level')
         self.current_lang = LANGUAGES[lang]
@@ -4883,21 +4899,50 @@ class SettingsScreen(BaseScreen):
 
     def toggle_quick_easy(self, v: bool):
         self.app.quick_mode_easy = v
-        if (not v) and (not self.app.quick_mode_medium) and (not self.app.quick_mode_hard):
+        if (
+                (not v)
+                and (not self.app.quick_mode_easy_words)
+                and (not self.app.quick_mode_medium)
+                and (not self.app.quick_mode_hard)
+        ):
+            self.app.quick_mode_easy_words = True
+            Clock.schedule_once(lambda dt: setattr(self.ids["quick_easy_words_sw"], "active", True), 0)
+        self.app.save_settings()
+
+    def toggle_quick_easy_words(self, v: bool):
+        self.app.quick_mode_easy_words = v
+
+        if (
+                (not v)
+                and (not self.app.quick_mode_easy)
+                and (not self.app.quick_mode_medium)
+                and (not self.app.quick_mode_hard)
+        ):
             self.app.quick_mode_medium = True
             Clock.schedule_once(lambda dt: setattr(self.ids["quick_medium_sw"], "active", True), 0)
+
         self.app.save_settings()
 
     def toggle_quick_medium(self, v: bool):
         self.app.quick_mode_medium = v
-        if (not v) and (not self.app.quick_mode_easy) and (not self.app.quick_mode_hard):
+        if (
+                (not v)
+                and (not self.app.quick_mode_easy)
+                and (not self.app.quick_mode_easy_words)
+                and (not self.app.quick_mode_hard)
+        ):
             self.app.quick_mode_hard = True
             Clock.schedule_once(lambda dt: setattr(self.ids["quick_hard_sw"], "active", True), 0)
         self.app.save_settings()
 
     def toggle_quick_hard(self, v: bool):
         self.app.quick_mode_hard = v
-        if (not v) and (not self.app.quick_mode_easy) and (not self.app.quick_mode_medium):
+        if (
+                (not v)
+                and (not self.app.quick_mode_easy)
+                and (not self.app.quick_mode_easy_words)
+                and (not self.app.quick_mode_medium)
+        ):
             self.app.quick_mode_easy = True
             Clock.schedule_once(lambda dt: setattr(self.ids["quick_easy_sw"], "active", True), 0)
         self.app.save_settings()
@@ -4974,7 +5019,6 @@ class BrailleApp(App):
     use_stats = BooleanProperty(True)
     quick_streak = NumericProperty(0)
     quick_active = BooleanProperty(False)
-    quick_mode_weights = DictProperty({'easy': 33, 'medium': 33, 'hard': 33})
     mirror_writing_mode = BooleanProperty(False)
     word_lists = DictProperty({})
     easy_mode_letters = BooleanProperty(True)
@@ -4986,6 +5030,7 @@ class BrailleApp(App):
     memo_mode_letters = BooleanProperty(True)
     memo_mode_digits = BooleanProperty(True)
     quick_mode_easy = BooleanProperty(True)
+    quick_mode_easy_words = BooleanProperty(True)
     quick_mode_medium = BooleanProperty(True)
     quick_mode_hard = BooleanProperty(True)
     LESSON_STARS_MAX = 5
@@ -5089,6 +5134,8 @@ class BrailleApp(App):
         enabled = []
         if self.quick_mode_easy:
             enabled.append("easy")
+        if self.quick_mode_easy_words:
+            enabled.append("easy_words")
         if self.quick_mode_medium:
             enabled.append("medium")
         if self.quick_mode_hard:
@@ -5097,17 +5144,7 @@ class BrailleApp(App):
         if not enabled:
             enabled = ["easy"]
 
-        weights_map = self.quick_mode_weights or {}
-        weights = [weights_map.get(m, 1) for m in enabled]
-
-        total = sum(weights)
-        r = random.uniform(0, total)
-        upto = 0
-        for m, w in zip(enabled, weights):
-            upto += w
-            if upto >= r:
-                return m
-        return enabled[0]
+        return random.choice(enabled)
 
     def start_quick_review(self):
         self.quick_streak = 0
@@ -5120,17 +5157,27 @@ class BrailleApp(App):
     def next_quick_step(self):
         if not self.quick_active or not self.root:
             return
+
         mode = self.choose_quick_mode()
+
         if mode == 'easy':
             scr = self.get_screen('practice')
             scr.quick_review_mode = True
             self.switch_screen('practice')
             scr.new_question()
+
+        elif mode == 'easy_words':
+            scr = self.get_screen('easy_words_practice')
+            scr.quick_review_mode = True
+            self.switch_screen('easy_words_practice')
+            scr.new_question()
+
         elif mode == 'medium':
             scr = self.get_screen('medium_practice')
             scr.quick_review_mode = True
             self.switch_screen('medium_practice')
             scr.new_question()
+
         else:
             scr = self.get_screen('hard_practice')
             scr.quick_review_mode = True
@@ -5307,6 +5354,7 @@ class BrailleApp(App):
             self.medium_mode_letters = data.get('medium_mode_letters', True)
             self.medium_mode_digits = data.get('medium_mode_digits', True)
             self.quick_mode_easy = data.get('quick_mode_easy', True)
+            self.quick_mode_easy_words = data.get('quick_mode_easy_words', True)
             self.quick_mode_medium = data.get('quick_mode_medium', True)
             self.quick_mode_hard = data.get('quick_mode_hard', True)
             self.memo_mode_letters = data.get('memo_mode_letters', True)
@@ -5329,6 +5377,7 @@ class BrailleApp(App):
             'medium_mode_letters': self.medium_mode_letters,
             'medium_mode_digits': self.medium_mode_digits,
             'quick_mode_easy': self.quick_mode_easy,
+            'quick_mode_easy_words': self.quick_mode_easy_words,
             'quick_mode_medium': self.quick_mode_medium,
             'quick_mode_hard': self.quick_mode_hard,
             'memo_mode_letters': self.memo_mode_letters,
