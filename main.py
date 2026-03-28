@@ -1,7 +1,6 @@
 from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListProperty, NumericProperty
 from kivy.uix.bubble import Bubble, BubbleContent, BubbleButton
 from kivy.uix.screenmanager import ScreenManager, Screen
-from typing import Callable, Optional, Sequence, Tuple
 from kivy.core.text import Label as CoreLabel
 from kivy.core.clipboard import Clipboard
 from kivy.resources import resource_find
@@ -1957,10 +1956,6 @@ class BaseScreen(Screen):
         self.scheduled_events.append(event)
         return event
 
-    def stars_str(self, stars, max_stars = 5):
-        stars = max(0, min(int(stars), int(max_stars)))
-        return "★" * stars + "☆" * (max_stars - stars)
-
     def dots_for_symbol(self, sym):
         if sym in digits_data:
             return digits_data[sym]
@@ -2535,7 +2530,6 @@ class LessonTestScreen(BaseScreen):
         self.correct = 0
         self.invert_mode = False
         self.correct_button = None
-        self.scheduled_events = []
         self.lesson_type = 'letters'
 
     def on_leave(self, *args):
@@ -2742,7 +2736,6 @@ class PracticeScreen(BaseScreen):
     def __init__(self, **kwargs):
         self.current_streak = 0
         self.correct_button = None
-        self.scheduled_events = []
         self._answer_buttons = []
         self._last_layout_key = None
         self._grid_bound = False
@@ -3273,7 +3266,6 @@ class EasyWordsPracticeScreen(BaseScreen):
 class MediumPracticeScreen(BaseScreen):
     braille_char = StringProperty()
     current_letter = StringProperty()
-    score = NumericProperty(0)
     current_dots = ListProperty([])
     user_input = ListProperty([0] * 6)
     dot_buttons = ListProperty([])
@@ -3290,7 +3282,6 @@ class MediumPracticeScreen(BaseScreen):
         super().__init__(**kwargs)
         self.dot_buttons = []
         self.current_streak = 0
-        self.scheduled_events = []
         self.hint_used = False
         self.current_letter = ''
         self._pulse_anims = {}
@@ -3502,7 +3493,6 @@ class HardPracticeScreen(BaseScreen):
     streak_text = StringProperty(" \n ")
     current_word_text = StringProperty()
     no_errors_btn = StringProperty()
-    confirm_btn = StringProperty()
     current_streak = NumericProperty(0)
     current_word = ''
     correct_braille_word = ListProperty()
@@ -3519,7 +3509,6 @@ class HardPracticeScreen(BaseScreen):
 
     def __init__(self, **kwargs):
         self.correction_dot_buttons = []
-        self.scheduled_events = []
         super().__init__(**kwargs)
 
     def on_kv_post(self, base_widget):
@@ -3544,7 +3533,6 @@ class HardPracticeScreen(BaseScreen):
     def update_lang(self):
         super().update_lang()
         self.no_errors_btn = self.get_translation('no_errors_btn')
-        self.confirm_btn = self.get_translation('confirm_btn')
 
     def generate_word(self, length=None):
         lang = self.app.current_language
