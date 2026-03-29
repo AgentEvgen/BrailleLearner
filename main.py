@@ -26,8 +26,8 @@ import os
 
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
-font_path = resource_find("assets/DejaVuSans.ttf") or os.path.join(os.path.dirname(__file__), "assets",
-                                                                   "DejaVuSans.ttf")
+font_path = resource_find("assets/Quivira-mod.ttf") or os.path.join(os.path.dirname(__file__), "assets",
+                                                                   "Quivira-mod.ttf")
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
@@ -4517,11 +4517,8 @@ class ReferenceScreen(BaseScreen):
         for d, dots in digits_items:
             braille_char = ns + self.get_braille_char(dots)
 
-            if self.app.use_stats:
-                st = self.app.stats[lang].get(d, {"correct": 0, "wrong": 0})
-                stats_text = stats_fmt.format(st["correct"], st["wrong"])
-            else:
-                stats_text = ""
+            st = self.app.stats[lang].get(d, {"correct": 0, "wrong": 0})
+            stats_text = stats_fmt.format(st["correct"], st["wrong"])
 
             data.append({
                 "viewclass": "ReferenceRow",
@@ -4534,9 +4531,6 @@ class ReferenceScreen(BaseScreen):
         self.ids.rv.data = data
 
     def _refresh_stats_in_rv(self):
-        if not self.app.use_stats:
-            return
-
         lang = self.app.current_language
         fmt = self.get_translation('stats_label')
 
