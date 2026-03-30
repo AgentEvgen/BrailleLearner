@@ -3493,6 +3493,7 @@ class HardPracticeScreen(BaseScreen):
     streak_text = StringProperty(" \n ")
     current_word_text = StringProperty()
     no_errors_btn = StringProperty()
+  confirm_btn = StringProperty()
     current_streak = NumericProperty(0)
     current_word = ''
     correct_braille_word = ListProperty()
@@ -3533,6 +3534,7 @@ class HardPracticeScreen(BaseScreen):
     def update_lang(self):
         super().update_lang()
         self.no_errors_btn = self.get_translation('no_errors_btn')
+        self.confirm_btn = self.get_translation('confirm_btn')
 
     def generate_word(self, length=None):
         lang = self.app.current_language
