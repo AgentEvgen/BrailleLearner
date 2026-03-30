@@ -3493,7 +3493,7 @@ class HardPracticeScreen(BaseScreen):
     streak_text = StringProperty(" \n ")
     current_word_text = StringProperty()
     no_errors_btn = StringProperty()
-  confirm_btn = StringProperty()
+    confirm_btn = StringProperty()
     current_streak = NumericProperty(0)
     current_word = ''
     correct_braille_word = ListProperty()
