@@ -91,18 +91,23 @@ Builder.load_string('''
                 spacing: dp(15)
                 BaseButton:
                     text: root.training_title
+                    font_name: 'BrailleFont'
                     on_press: app.switch_screen('lessons')
                 BaseButton:
                     text: root.practice
+                    font_name: 'BrailleFont'
                     on_press: app.switch_screen('practice_levels')
                 BaseButton:
                     text: root.reference_title
+                    font_name: 'BrailleFont'
                     on_press: app.switch_screen('reference')
                 BaseButton:
                     text: root.translator_title
+                    font_name: 'BrailleFont'
                     on_press: app.switch_screen('translator')
                 BaseButton:
                     text: root.settings_title
+                    font_name: 'BrailleFont'
                     on_press: app.switch_screen('settings')
         Widget:
             size_hint_y: None
@@ -128,6 +133,7 @@ Builder.load_string('''
         size_hint_y: None
         height: dp(24)
         font_size: dp(17)
+        font_name: 'BrailleFont'
         halign: 'left'
         valign: 'middle'
         bold: True
@@ -138,6 +144,7 @@ Builder.load_string('''
         size_hint_y: None
         height: root.letters_height
         font_size: dp(14)
+        font_name: 'BrailleFont'
         halign: 'left'
         valign: 'top'
         color: (0.75, 0.75, 0.75, 1)
@@ -152,6 +159,7 @@ Builder.load_string('''
             text: root.btn_text
             size_hint_x: 0.5
             font_size: dp(15)
+            font_name: 'BrailleFont'
             disabled: not root.is_unlocked
             on_press: app.get_screen('lessons').open_lesson(root.lesson_index)
 
@@ -163,6 +171,7 @@ Builder.load_string('''
             halign: 'right'
             valign: 'middle'
             font_size: dp(14)
+            font_name: 'BrailleFont'
             text_size: self.size
 
 <LessonsScreen>:
@@ -173,6 +182,7 @@ Builder.load_string('''
 
         Label:
             text: root.lessons_title
+            font_name: 'BrailleFont'
             font_size: dp(26)
             size_hint_y: None
             height: dp(50)
@@ -187,11 +197,13 @@ Builder.load_string('''
 
             Button:
                 text: root.letters_tab_text
+                font_name: 'BrailleFont'
                 background_color: (1.5, 1.5, 1.5, 1) if root.current_mode == 'letters' else (1, 1, 1, 1)
                 on_press: root.switch_mode('letters')
 
             Button:
                 text: root.digits_tab_text
+                font_name: 'BrailleFont'
                 background_color: (1.5, 1.5, 1.5, 1) if root.current_mode == 'digits' else (1, 1, 1, 1)
                 on_press: root.switch_mode('digits')
 
@@ -213,6 +225,7 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: app.switch_screen('menu')
 
@@ -225,6 +238,7 @@ Builder.load_string('''
         Label:
             text: root.lesson_title
             font_size: dp(20)
+            font_name: 'BrailleFont'
             size_hint_y: None
             height: dp(42)
             text_size: self.width, None
@@ -245,6 +259,7 @@ Builder.load_string('''
                 Label:
                     id: study_symbol
                     text: root.current_symbol
+                    font_name: 'BrailleFont'
                     font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
                     size_hint_y: 0.35
                     halign: 'center'
@@ -346,6 +361,7 @@ Builder.load_string('''
             BaseButton:
                 id: back_finish_btn
                 text: root.back_btn if root.is_learning_active else root.finish_btn_text
+                font_name: 'BrailleFont'
                 height: dp(50)
                 on_press: app.switch_screen('lessons') if root.is_learning_active else root.finish_lesson()
 
@@ -357,19 +373,21 @@ Builder.load_string('''
 
         Label:
             text: root.test_title
+            font_name: 'BrailleFont'
             font_size: dp(22)
             size_hint_y: None
             height: dp(42)
 
         Label:
             text: root.counter_label
+            font_name: 'BrailleFont'
             font_size: dp(16)
             size_hint_y: None
             height: dp(28)
 
         Label:
             text: root.prompt_text
-            font_name: 'BrailleFont' if root.prompt_is_braille else 'Roboto'
+            font_name: 'BrailleFont'
             font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
             size_hint_y: 0.35
             halign: 'center'
@@ -390,6 +408,7 @@ Builder.load_string('''
 
             BaseButton:
                 text: root.back_btn
+                font_name: 'BrailleFont'
                 height: dp(50)
                 on_press: app.switch_screen('lessons')
 
@@ -405,6 +424,7 @@ Builder.load_string('''
             spacing: dp(5)
             StreakHeader:
                 streak_text: root.streak_text
+                font_name: 'BrailleFont'
                 time_left: root.time_left
                 quick_review_mode: root.quick_review_mode
 
@@ -427,6 +447,7 @@ Builder.load_string('''
             row_default_height: dp(80)
         BaseButton:
             text: root.back_btn
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: root.exit_to_practice_levels()
 
@@ -443,6 +464,7 @@ Builder.load_string('''
             spacing: dp(5)
             StreakHeader:
                 streak_text: root.streak_text
+                font_name: 'BrailleFont'
                 time_left: root.time_left
                 quick_review_mode: root.quick_review_mode
 
@@ -471,6 +493,7 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: root.exit_to_practice_levels()
 
@@ -492,6 +515,7 @@ Builder.load_string('''
 
         Label:
             text: root.current_letter
+            font_name: 'BrailleFont'
             font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
             size_hint_y: 0.15
             halign: 'center'
@@ -587,6 +611,7 @@ Builder.load_string('''
             BaseButton:
                 id: confirm_btn
                 text: root.confirm_btn
+                font_name: 'BrailleFont'
                 size_hint: 0.45, None
                 height: dp(50)
                 on_press: root.confirm_answer()
@@ -596,6 +621,7 @@ Builder.load_string('''
             BaseButton:
                 id: hint_btn
                 text: root.hint_btn
+                font_name: 'BrailleFont'
                 size_hint: 0.45, None
                 height: dp(50)
                 on_press: root.show_hint()
@@ -604,9 +630,8 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
-            size_hint: 1, None
+            font_name: 'BrailleFont'
             height: dp(50)
-            pos_hint: {'center_x': 0.5}
             on_press: root.exit_to_practice_levels()
 
 <HardPracticeScreen>:
@@ -629,6 +654,7 @@ Builder.load_string('''
             Label:
                 id: word_label
                 text: root.current_word_text
+                font_name: 'BrailleFont'
                 font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
                 size_hint_y: 0.25
                 halign: 'center'
@@ -655,13 +681,14 @@ Builder.load_string('''
                 BaseButton:
                     id: no_error_btn
                     text: root.no_errors_btn
+                    font_name: 'BrailleFont'
                     on_press: root.on_no_error_press()
                     height: dp(50)
                     background_disabled_normal: self.background_normal
 
             BaseButton:
                 text: root.back_btn
-                size_hint: 1, None
+                font_name: 'BrailleFont'
                 height: dp(50)
                 on_press: root.exit_to_practice_levels()
 
@@ -698,6 +725,7 @@ Builder.load_string('''
 
             BaseButton:
                 text: root.confirm_btn
+                font_name: 'BrailleFont'
                 size_hint: 0.6, None
                 height: dp(50)
                 pos_hint: {'center_x': 0.5}
@@ -758,6 +786,7 @@ Builder.load_string('''
 
             Label:
                 text: root.game_title
+                font_name: 'BrailleFont'
                 font_size: dp(22)
                 bold: True
                 halign: 'left'
@@ -768,6 +797,7 @@ Builder.load_string('''
 
             Label:
                 text: root.moves_label
+                font_name: 'BrailleFont'
                 font_size: dp(18)
                 halign: 'right'
                 size_hint_x: 0.4
@@ -793,7 +823,7 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
-            size_hint_y: None
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: app.switch_screen('practice_levels')
 
@@ -810,6 +840,7 @@ Builder.load_string('''
 
             Label:
                 text: root.title
+                font_name: 'BrailleFont'
                 font_size: dp(22)
                 bold: True
                 halign: 'left'
@@ -819,6 +850,7 @@ Builder.load_string('''
 
             Label:
                 text: root.status_text
+                font_name: 'BrailleFont'
                 font_size: dp(16)
                 halign: 'right'
                 text_size: self.size
@@ -851,6 +883,7 @@ Builder.load_string('''
 
             Label:
                 text: root.words_title
+                font_name: 'BrailleFont'
                 font_size: dp(18)
                 size_hint_y: None
                 height: dp(24)
@@ -867,6 +900,7 @@ Builder.load_string('''
                 Label:
                     id: words_label
                     text: root.words_line
+                    font_name: 'BrailleFont'
                     markup: True
                     font_size: dp(18)
                     size_hint_y: None
@@ -883,6 +917,7 @@ Builder.load_string('''
 
             BaseButton:
                 text: root.back_btn
+                font_name: 'BrailleFont'
                 height: dp(50)
                 on_press: app.switch_screen('practice_levels')
 
@@ -920,6 +955,7 @@ Builder.load_string('''
 
         Label:
             text: root.settings_title
+            font_name: 'BrailleFont'
             font_size: dp(28)
             bold: True
             size_hint_y: None
@@ -941,6 +977,7 @@ Builder.load_string('''
                 SettingsSection:
                     SettingsHeader:
                         text: root.general_settings_header
+                        font_name: 'BrailleFont'
 
                     BoxLayout:
                         size_hint_y: None
@@ -948,6 +985,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.language_label
+                            font_name: 'BrailleFont'
                             size_hint_x: None
                             width: dp(100)
                             halign: 'left'
@@ -956,6 +994,7 @@ Builder.load_string('''
                         Spinner:
                             id: lang_spinner
                             text: root.current_lang
+                            font_name: 'BrailleFont'
                             values: root.language_values
                             size_hint_x: None
                             width: dp(150) if app.is_mobile else dp(200)
@@ -967,6 +1006,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.use_stats
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -979,16 +1019,19 @@ Builder.load_string('''
 
                     BaseButton:
                         text: root.reset_stats_btn
+                        font_name: 'BrailleFont'
                         height: dp(50)
                         on_press: root.reset_stats()
                     BaseButton:
                         text: root.reset_lessons_btn
+                        font_name: 'BrailleFont'
                         height: dp(50)
                         on_press: root.reset_lessons_progress()
 
                 SettingsSection:
                     SettingsHeader:
                         text: root.easy_mode_header
+                        font_name: 'BrailleFont'
 
                     BoxLayout:
                         size_hint_y: None
@@ -996,6 +1039,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.difficulty_label
+                            font_name: 'BrailleFont'
                             size_hint_x: None
                             width: dp(100)
                             halign: 'left'
@@ -1004,6 +1048,7 @@ Builder.load_string('''
                         Spinner:
                             id: difficulty_spinner
                             text: root.current_difficulty_str
+                            font_name: 'BrailleFont'
                             values: root.difficulty_values
                             size_hint_x: None
                             width: dp(150) if app.is_mobile else dp(200)
@@ -1015,6 +1060,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1031,6 +1077,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1044,6 +1091,7 @@ Builder.load_string('''
                 SettingsSection:
                     SettingsHeader:
                         text: root.medium_mode_header
+                        font_name: 'BrailleFont'
 
                     BoxLayout:
                         size_hint_y: None
@@ -1051,6 +1099,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.mirror_mode_label
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1067,6 +1116,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1083,6 +1133,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1096,6 +1147,7 @@ Builder.load_string('''
                 SettingsSection:
                     SettingsHeader:
                         text: root.quick_review_header
+                        font_name: 'BrailleFont'
 
                     BoxLayout:
                         size_hint_y: None
@@ -1103,6 +1155,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.time_label
+                            font_name: 'BrailleFont'
                             size_hint_x: None
                             width: dp(150)
                             halign: 'left'
@@ -1112,6 +1165,7 @@ Builder.load_string('''
                             id: time_input
                             font_name: 'BrailleFont'
                             text: str(app.quick_review_time)
+                            font_name: 'BrailleFont'
                             hint_text: root.time_hint
                             input_filter: 'int'
                             multiline: False
@@ -1125,6 +1179,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_easy_label
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1140,6 +1195,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_easy_words_label
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1155,6 +1211,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_medium_label
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1171,6 +1228,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_hard_label
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1184,6 +1242,7 @@ Builder.load_string('''
                 SettingsSection:
                     SettingsHeader:
                         text: root.memory_game_title
+                        font_name: 'BrailleFont'
 
                     BoxLayout:
                         size_hint_y: None
@@ -1191,6 +1250,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1207,6 +1267,7 @@ Builder.load_string('''
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
+                            font_name: 'BrailleFont'
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
@@ -1223,6 +1284,7 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: app.switch_screen('menu')
 
@@ -1243,6 +1305,7 @@ Builder.load_string('''
 
     Label:
         text: root.symbol
+        font_name: 'BrailleFont'
         font_size: dp(26) if root.is_header else dp(56)
         bold: root.is_header
         size_hint_x: 1 if root.is_header else 0.25
@@ -1253,6 +1316,7 @@ Builder.load_string('''
 
     Label:
         text: root.stats if not root.is_header else ''
+        font_name: 'BrailleFont'
         font_size: dp(18)
         size_hint_x: 0 if root.is_header else 0.5
         opacity: 0 if root.is_header else 1
@@ -1280,6 +1344,7 @@ Builder.load_string('''
 
         Label:
             text: root.reference_title
+            font_name: 'BrailleFont'
             font_size: dp(28)
             size_hint_y: None
             height: dp(45)
@@ -1305,6 +1370,7 @@ Builder.load_string('''
 
         BaseButton:
             text: root.back_btn
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: app.switch_screen('menu')
 
@@ -1316,6 +1382,7 @@ Builder.load_string('''
 
         Label:
             text: root.translator_title
+            font_name: 'BrailleFont'
             font_size: dp(26)
             size_hint_y: None
             height: dp(45)
@@ -1341,12 +1408,14 @@ Builder.load_string('''
             BaseButton:
                 id: copy_btn
                 text: root.copy_btn
+                font_name: 'BrailleFont'
                 size_hint: (1, 1)
                 height: dp(60)
                 on_press: root.copy_braille_result()
 
             BaseButton:
                 text: root.input_braille_btn
+                font_name: 'BrailleFont'
                 size_hint: (1, 1)
                 height: dp(60)
                 on_press: root.open_braille_input()
@@ -1459,19 +1528,21 @@ Builder.load_string('''
 
                     BaseButton:
                         text: root.confirm_btn
+                        font_name: 'BrailleFont'
                         size_hint: 0.5, 1
                         height: dp(60)
                         on_press: root.confirm_braille_input()
 
                     BaseButton:
                         text: root.delete_btn
+                        font_name: 'BrailleFont'
                         size_hint: 0.5, 1
                         height: dp(60)
                         on_press: root.delete_last_char()
 
         BaseButton:
             text: root.back_btn
-            size_hint_y: None
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press:
                 root.close_braille_input()
@@ -1485,6 +1556,7 @@ Builder.load_string('''
 
         Label:
             text: root.title
+            font_name: 'BrailleFont'
             font_size: dp(26)
             size_hint_y: None
             height: dp(60)
@@ -1520,18 +1592,23 @@ Builder.load_string('''
 
                     BaseButton:
                         text: root.easy_level_btn
+                        font_name: 'BrailleFont'
                         on_press: root.start_easy_level()
                     BaseButton:
                         text: root.easy_words_level_btn
+                        font_name: 'BrailleFont'
                         on_press: root.start_easy_words_level()
                     BaseButton:
                         text: root.medium_level_btn
+                        font_name: 'BrailleFont'
                         on_press: root.start_medium_level()
                     BaseButton:
                         text: root.hard_level_btn
+                        font_name: 'BrailleFont'
                         on_press: root.start_hard_level()
                     BaseButton:
                         text: root.quick_review_btn
+                        font_name: 'BrailleFont'
                         on_press: root.start_quick_review()
 
                 BoxLayout:
@@ -1558,17 +1635,20 @@ Builder.load_string('''
                         color: 0.95, 0.95, 0.95, 1
                         text_size: self.width, None
                         text: root.games
+                        font_name: 'BrailleFont'
 
                     BaseButton:
                         text: root.memory_game_title
+                        font_name: 'BrailleFont'
                         on_press: app.switch_screen('memory_game')
                     BaseButton:
                         text: root.word_search_title
+                        font_name: 'BrailleFont'
                         on_press: app.switch_screen('word_search')
 
         BaseButton:
             text: root.back_btn
-            size_hint_y: None
+            font_name: 'BrailleFont'
             height: dp(50)
             on_press: app.switch_screen('menu')
 ''')
@@ -2342,6 +2422,7 @@ class LessonStudyScreen(BaseScreen):
             letter_label = Label(
                 text="",
                 font_size=dp(58),
+                font_name='BrailleFont',
                 halign='center',
                 valign='middle',
                 size_hint_y=None,
@@ -3032,6 +3113,7 @@ class EasyWordsPracticeScreen(BaseScreen):
             btn.background_disabled_normal = btn.background_normal
             btn.background_disabled_down = btn.background_down
             btn.answer_word = None
+            btn.font_name = 'BrailleFont'
             btn.halign = 'center'
             btn.valign = 'middle'
             btn.bind(size=lambda inst, value: setattr(
@@ -3174,7 +3256,7 @@ class EasyWordsPracticeScreen(BaseScreen):
                     btn.font_size = min(dp(30), row_h * 0.42)
                 else:
                     btn.text = ans
-                    btn.font_name = 'Roboto'
+                    btn.font_name = 'BrailleFont'
                     btn.font_size = min(dp(22), row_h * 0.28)
 
                 if ans == self.current_word:
