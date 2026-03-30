@@ -11,7 +11,6 @@ from kivy.core.window import Window
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.label import Label
-from kivy.utils import platform
 from kivy.config import Config
 from kivy.lang import Builder
 from kivy.clock import Clock
@@ -997,7 +996,7 @@ Builder.load_string('''
                             font_name: 'BrailleFont'
                             values: root.language_values
                             size_hint_x: None
-                            width: dp(150) if app.is_mobile else dp(200)
+                            width: dp(150)
                             on_text: root.update_settings('language', self.text)
 
                     BoxLayout:
@@ -1051,7 +1050,7 @@ Builder.load_string('''
                             font_name: 'BrailleFont'
                             values: root.difficulty_values
                             size_hint_x: None
-                            width: dp(150) if app.is_mobile else dp(200)
+                            width: dp(150)
                             on_text: root.update_settings('difficulty', self.text)
 
                     BoxLayout:
@@ -1170,7 +1169,7 @@ Builder.load_string('''
                             input_filter: 'int'
                             multiline: False
                             size_hint_x: None
-                            width: dp(150) if app.is_mobile else dp(200)
+                            width: dp(150)
                             padding: [dp(10), (self.height - self.line_height) / 2]
                             on_text: root.update_settings('time', self.text)
                     BoxLayout:
@@ -5072,7 +5071,6 @@ class BrailleApp(App):
     current_language = StringProperty('en')
     current_difficulty = StringProperty('4')
     quick_review_time = NumericProperty(5)
-    is_mobile = BooleanProperty(False)
     stats = DictProperty({})
     use_stats = BooleanProperty(True)
     quick_streak = NumericProperty(0)
@@ -5119,17 +5117,16 @@ class BrailleApp(App):
         translations, LANGUAGES = load_translations()
 
         print(self.user_data_dir)
-        self.is_mobile = platform in ('android', 'ios')
         self.braille_data = braille_data
         self.load_settings()
-        self.load_high_scores()
         sm = ScreenManager()
         self._load_screen(sm, 'menu')
-        Clock.schedule_once(self._deferred_init, 0)
+        Clock.schedule_once(self._deferred_init, 0.05)
 
         return sm
 
     def _deferred_init(self, dt):
+        self.load_high_scores()
         self.load_lessons_progress()
         self.digits_lessons = self.build_lessons(list(digits_data.keys()), group_size=5)
         self.load_stats()
