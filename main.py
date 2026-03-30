@@ -996,7 +996,7 @@ Builder.load_string('''
                             font_name: 'BrailleFont'
                             values: root.language_values
                             size_hint_x: None
-                            width: dp(150)
+                            width: dp(200)
                             on_text: root.update_settings('language', self.text)
 
                     BoxLayout:
