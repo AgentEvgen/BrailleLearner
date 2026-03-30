@@ -2916,7 +2916,7 @@ class PracticeScreen(BaseScreen):
                     btn.font_size = min(dp(38), final_row_height * 0.55)
                 else:
                     btn.text = ans
-                    btn.font_name = 'Roboto'
+                    btn.font_name='BrailleFont',
                     btn.font_size = min(dp(24), final_row_height * 0.4)
 
                 if ans == self.current_symbol:
@@ -3857,7 +3857,7 @@ class MemoryCard(Button):
                     self.font_name = 'BrailleFont'
                     self.font_size = dp(46)
                 else:
-                    self.font_name = 'Roboto'
+                    self.font_name='BrailleFont',
                     self.font_size = dp(32)
             else:
                 self.face_down = True
@@ -3985,7 +3985,7 @@ class MemoryGameScreen(BaseScreen):
             card.disabled = False
             card.text = ''
             card.scale_x = 1
-            card.font_name = 'Roboto'
+            card.font_name='BrailleFont',
             card.font_size = dp(32)
 
         shuffled_cards = self._cards_pool[:]
@@ -4760,14 +4760,12 @@ class TranslatorScreen(BaseScreen):
         if self._contains_braille(raw):
             plain = self._translate_braille_to_text(raw)
             out_text = plain
-            font = 'Roboto'
             fs = dp(28)
             self.full_braille_text = raw
         else:
             braille_text = self._translate_text_to_braille(raw)
             self.full_braille_text = braille_text
             out_text = braille_text
-            font = 'BrailleFont'
             fs = dp(32)
 
         self._last_translated_text = raw
@@ -4781,7 +4779,7 @@ class TranslatorScreen(BaseScreen):
         for chunk in chunks:
             lbl = Label(
                 text=chunk,
-                font_name=font,
+                font_name='BrailleFont',
                 font_size=fs,
                 size_hint_y=None,
                 color=(1, 1, 1, 1),
@@ -5024,6 +5022,7 @@ class SettingsScreen(BaseScreen):
             size=(dp(360), dp(260)),
             auto_dismiss=False,
             font_size=dp(18),
+            font_name='BrailleFont',
             text_width=dp(300),
             buttons=[
                 (self.get_translation("yes"), do_reset),
@@ -5056,6 +5055,7 @@ class SettingsScreen(BaseScreen):
             size=(dp(360), dp(260)),
             auto_dismiss=False,
             font_size=dp(18),
+            font_name='BrailleFont',
             text_width=dp(320),
             buttons=[
                 (self.get_translation("yes"), do_reset),
