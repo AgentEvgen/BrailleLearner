@@ -12,10 +12,10 @@ source venv/bin/activate
 
 echo "--> Установка Python библиотек..."
 pip install --upgrade pip
-pip install Cython==0.29.33 kivy buildozer
+pip install Cython==0.29.33 kivy buildozer setuptools
 
 echo "--> Перенос конфигурации..."
-mv buildozer/* . 2>/dev/null || true
+mv buildozer/* .
 
 echo "--> Запуск сборки APK..."
 buildozer -v android debug
