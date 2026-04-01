@@ -2915,7 +2915,7 @@ class PracticeScreen(BaseScreen):
                     btn.font_size = min(dp(38), final_row_height * 0.55)
                 else:
                     btn.text = ans
-                    btn.font_name='BrailleFont',
+                    btn.font_name='BrailleFont'
                     btn.font_size = min(dp(24), final_row_height * 0.4)
 
                 if ans == self.current_symbol:
@@ -3856,7 +3856,7 @@ class MemoryCard(Button):
                     self.font_name = 'BrailleFont'
                     self.font_size = dp(46)
                 else:
-                    self.font_name='BrailleFont',
+                    self.font_name='BrailleFont'
                     self.font_size = dp(32)
             else:
                 self.face_down = True
@@ -3984,7 +3984,7 @@ class MemoryGameScreen(BaseScreen):
             card.disabled = False
             card.text = ''
             card.scale_x = 1
-            card.font_name='BrailleFont',
+            card.font_name='BrailleFont'
             card.font_size = dp(32)
 
         shuffled_cards = self._cards_pool[:]
