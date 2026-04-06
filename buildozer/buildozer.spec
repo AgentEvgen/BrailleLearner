@@ -10,7 +10,7 @@ package.name = braillelearner
 package.domain = xyz.braille.learner
 
 # (str) Application versioning
-version = 1.0.1
+version = 1.1.0
 
 # (list) Application requirements
 requirements = python3,kivy
