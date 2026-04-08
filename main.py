@@ -26,7 +26,7 @@ import os
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
 font_path = resource_find("assets/Quivira-mod.ttf") or os.path.join(os.path.dirname(__file__), "assets",
-                                                                   "Quivira-mod.ttf")
+                                                                    "Quivira-mod.ttf")
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
@@ -1659,6 +1659,7 @@ digits_data = {
     '7': [1, 1, 0, 1, 1, 0], '8': [1, 1, 0, 0, 1, 0], '9': [0, 1, 0, 1, 0, 0],
     '0': [0, 1, 0, 1, 1, 0]}
 
+
 def load_translations():
     translations_dir = resource_find("assets/translations") or os.path.join(
         os.path.dirname(__file__), "assets", "translations"
@@ -1702,6 +1703,7 @@ def load_translations():
 
     return loaded_translations, loaded_languages
 
+
 def load_braille_data():
     braille_dir = resource_find("assets/braille") or os.path.join(
         os.path.dirname(__file__), "assets", "braille"
@@ -1731,11 +1733,11 @@ def load_braille_data():
             valid_lang_map = {}
             for char, dots in data.items():
                 if (
-                    isinstance(char, str)
-                    and len(char) >= 1
-                    and isinstance(dots, list)
-                    and len(dots) == 6
-                    and all(x in (0, 1) for x in dots)
+                        isinstance(char, str)
+                        and len(char) >= 1
+                        and isinstance(dots, list)
+                        and len(dots) == 6
+                        and all(x in (0, 1) for x in dots)
                 ):
                     valid_lang_map[char] = dots
                 else:
@@ -1748,6 +1750,7 @@ def load_braille_data():
             print(f"Error loading braille file {path}: {e}")
 
     return loaded
+
 
 braille_data = load_braille_data()
 translations, LANGUAGES = load_translations()
@@ -1874,8 +1877,8 @@ class BaseScreen(Screen):
         if dots[5]: code |= 0x20
         return chr(code)
 
-    def update_streak_text(self, score_key, local_streak_attr = "current_streak",
-                           streak_prop = "streak_text", ):
+    def update_streak_text(self, score_key, local_streak_attr="current_streak",
+                           streak_prop="streak_text", ):
         lang = self.app.current_language
 
         is_quick = bool(getattr(self, "quick_review_mode", False))
@@ -1956,10 +1959,10 @@ class BaseScreen(Screen):
             event.cancel()
         self.scheduled_events.clear()
 
-    def show_popup(self, title, text = "", *, size=(dp(320), dp(240)), auto_dismiss = False,
-                   buttons = (), font_size=dp(20),
+    def show_popup(self, title, text="", *, size=(dp(320), dp(240)), auto_dismiss=False,
+                   buttons=(), font_size=dp(20),
                    padding=dp(20), spacing=dp(12), buttons_height=dp(50), buttons_spacing=dp(10),
-                   text_width = None):
+                   text_width=None):
 
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
 
@@ -2868,35 +2871,42 @@ class PracticeScreen(BaseScreen):
 
         horizontal_padding = dp(20)
         spacing = dp(5)
-        available_width = grid.width - (2 * horizontal_padding)
-        available_height = grid.height
         num_options = len(answers)
-        min_btn_width = dp(80)
-        max_cols_by_width = max(1, int(available_width // (min_btn_width + spacing)))
 
-        best_cols = 1
-        best_row_height = 0
-        for c in range(1, min(max_cols_by_width, num_options) + 1):
-            rows = math.ceil(num_options / c)
-            h = (available_height - (rows - 1) * spacing) / rows
-            if h > best_row_height:
-                best_row_height = h
-                best_cols = c
+        layout_cache_key = (grid.width, grid.height, num_options)
 
-        final_row_height = max(dp(50), min(best_row_height, dp(110)))
+        if layout_cache_key != self._last_layout_key:
+            self._last_layout_key = layout_cache_key
 
-        layout_key = (grid.width, grid.height, num_options, best_cols, final_row_height)
-        if layout_key != self._last_layout_key:
-            self._last_layout_key = layout_key
+            available_width = grid.width - (2 * horizontal_padding)
+            available_height = grid.height
+            min_btn_width = dp(80)
+            max_cols_by_width = max(1, int(available_width // (min_btn_width + spacing)))
+
+            best_cols = 1
+            best_row_height = 0
+            for c in range(1, min(max_cols_by_width, num_options) + 1):
+                rows = math.ceil(num_options / c)
+                h = (available_height - (rows - 1) * spacing) / rows
+                if h > best_row_height:
+                    best_row_height = h
+                    best_cols = c
+
+            final_row_height = max(dp(50), min(best_row_height, dp(110)))
+
             grid.cols = best_cols
             grid.padding = [horizontal_padding, 0, horizontal_padding, 0]
             grid.spacing = spacing
             grid.row_default_height = final_row_height
             grid.row_force_default = True
 
-        ns = self.get_braille_char(number_sign_dots)
+            self._cached_row_height = final_row_height
+        else:
+            final_row_height = self._cached_row_height
 
+        ns = self.get_braille_char(number_sign_dots)
         self.correct_button = None
+
         for i, btn in enumerate(self._answer_buttons):
             if i < num_options:
                 ans = answers[i]
@@ -2915,7 +2925,7 @@ class PracticeScreen(BaseScreen):
                     btn.font_size = min(dp(38), final_row_height * 0.55)
                 else:
                     btn.text = ans
-                    btn.font_name='BrailleFont'
+                    btn.font_name = 'BrailleFont'
                     btn.font_size = min(dp(24), final_row_height * 0.4)
 
                 if ans == self.current_symbol:
@@ -3743,13 +3753,18 @@ class HardPracticeScreen(BaseScreen):
 
     def reset_ui_state(self):
         self._controls_locked = False
-        if hasattr(self.ids, 'braille_word_box'):
+
+        if 'braille_word_box' in self.ids:
             self.ids.braille_word_box.clear_widgets()
+
         self.correction_panel_visible = False
+
         if hasattr(self.ids, 'no_error_btn'):
             self.ids.no_error_btn.disabled = False
             self.ids.no_error_btn.background_color = (1, 1, 1, 1)
+
         self.user_input = [0] * 6
+
         for btn in self.correction_dot_buttons:
             btn.background_color = (1, 1, 1, 1)
 
@@ -3856,7 +3871,7 @@ class MemoryCard(Button):
                     self.font_name = 'BrailleFont'
                     self.font_size = dp(46)
                 else:
-                    self.font_name='BrailleFont'
+                    self.font_name = 'BrailleFont'
                     self.font_size = dp(32)
             else:
                 self.face_down = True
@@ -3984,7 +3999,7 @@ class MemoryGameScreen(BaseScreen):
             card.disabled = False
             card.text = ''
             card.scale_x = 1
-            card.font_name='BrailleFont'
+            card.font_name = 'BrailleFont',
             card.font_size = dp(32)
 
         shuffled_cards = self._cards_pool[:]
@@ -5364,6 +5379,9 @@ class BrailleApp(App):
         return os.path.join(self.user_data_dir, filename)
 
     def load_word_list(self, lang):
+        if lang in self.word_lists:
+            return
+
         path = resource_find(f"assets/words/{lang}.txt")
 
         if not path:
@@ -5439,9 +5457,6 @@ class BrailleApp(App):
             'memo_mode_digits': self.memo_mode_digits,
         }
         self._atomic_json_dump("settings.json", data)
-
-        self.save_high_scores()
-        self.save_stats()
 
     def load_high_scores(self):
         langs = self.get_available_languages()
