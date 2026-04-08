@@ -1,6 +1,6 @@
 echo "--> Установка системных зависимостей..."
 sudo apt update
-sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev python3-dev python3-pip python3-setuptools python3-venv openjdk-17-jdk
+sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev python3-dev python3-pip python3-setuptools python3-venv openjdk-17-jdk libtinfo6
 
 echo "--> Клонирование проекта..."
 git clone https://github.com/AgentEvgen/BrailleLearner.git
