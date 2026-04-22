@@ -474,7 +474,7 @@ Builder.load_string('''
 
             Label:
                 text: root.prompt_text
-                font_name: 'BrailleFont' if root.prompt_is_braille else 'Roboto'
+                font_name: 'BrailleFont'
                 font_size: min(dp(56), self.height * 0.42) if self.height > 0 else dp(32)
                 size_hint: (0.95, 0.95)
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
@@ -995,8 +995,7 @@ Builder.load_string('''
                             text: root.current_lang
                             font_name: 'BrailleFont'
                             values: root.language_values
-                            size_hint_x: None
-                            width: dp(200)
+                            size_hint_x: 1
                             on_text: root.update_settings('language', self.text)
 
                     BoxLayout:
@@ -1049,7 +1048,7 @@ Builder.load_string('''
                             text: root.current_difficulty_str
                             font_name: 'BrailleFont'
                             values: root.difficulty_values
-                            size_hint_x: None
+                            size_hint_x: 1
                             width: dp(150)
                             on_text: root.update_settings('difficulty', self.text)
 
@@ -1168,7 +1167,7 @@ Builder.load_string('''
                             hint_text: root.time_hint
                             input_filter: 'int'
                             multiline: False
-                            size_hint_x: None
+                            size_hint_x: 1
                             width: dp(150)
                             padding: [dp(10), (self.height - self.line_height) / 2]
                             on_text: root.update_settings('time', self.text)
@@ -2319,6 +2318,8 @@ class LessonStudyScreen(BaseScreen):
         self._pulse_anims = {}
         self._locked = False
         self._letters_table_widgets = []
+        self._phase = 'learn'
+        self._practice_indices = []
 
     def update_lang(self):
         super().update_lang()
@@ -2332,12 +2333,13 @@ class LessonStudyScreen(BaseScreen):
         self.letters = letters[:]
         self.lesson_type = lesson_type
         self.is_learning_active = True
+        self._phase = 'learn'
+        self._i = 0
 
         self.update_lang()
         mode_title = self.get_translation('training_title')
         self.lesson_title = f"{self.get_translation('lesson')} {lesson_index + 1}: {mode_title}"
 
-        self._i = 0
         Clock.schedule_once(lambda dt: self._show_current(), 0)
 
     def _dots_for_symbol(self, sym):
@@ -2391,14 +2393,20 @@ class LessonStudyScreen(BaseScreen):
             Clock.schedule_once(lambda dt: self._show_current(), 0)
             return
 
+        if self._phase == 'learn':
+            self._show_learn_phase()
+        elif self._phase == 'practice':
+            self._show_practice_phase()
+        else:
+            self._show_review_phase()
+
+    def _show_learn_phase(self):
         if self._i >= len(self.letters):
-            self.is_learning_active = False
-            self.current_symbol = ""
-            self._stop_all_pulses()
-            self._locked = True
-            for b in self._dot_btns:
-                b.disabled = True
-            self._show_letters_table()
+            self._phase = 'practice'
+            self._practice_indices = list(range(len(self.letters)))
+            random.shuffle(self._practice_indices)
+            self._i = 0
+            self._show_current()
             return
 
         self._locked = False
@@ -2415,6 +2423,36 @@ class LessonStudyScreen(BaseScreen):
         lbl.opacity = 0
         Animation(opacity=1, duration=0.25).start(lbl)
 
+    def _show_practice_phase(self):
+        if self._i >= len(self._practice_indices):
+            self._phase = 'review'
+            self._i = 0
+            self._show_current()
+            return
+
+        idx = self._practice_indices[self._i]
+        self._locked = False
+        self.current_symbol = self.letters[idx]
+        self._target_dots = self._dots_for_symbol(self.current_symbol)
+        self._pressed = [0] * 6
+
+        self._stop_all_pulses()
+        self._reset_buttons_visual()
+
+        lbl = self.ids.study_symbol
+        Animation.cancel_all(lbl, "opacity")
+        lbl.opacity = 0
+        Animation(opacity=1, duration=0.25).start(lbl)
+
+    def _show_review_phase(self):
+        self.is_learning_active = False
+        self.current_symbol = ""
+        self._stop_all_pulses()
+        self._locked = True
+        for b in self._dot_btns:
+            b.disabled = True
+        self._show_letters_table()
+
     def _show_letters_table(self):
         grid = self.ids.letters_grid
 
@@ -2424,7 +2462,6 @@ class LessonStudyScreen(BaseScreen):
             letter_label = Label(
                 text="",
                 font_size=dp(58),
-                font_name='BrailleFont',
                 halign='center',
                 valign='middle',
                 size_hint_y=None,
@@ -2494,6 +2531,9 @@ class LessonStudyScreen(BaseScreen):
         need = bool(self._target_dots[dot_index])
 
         if not need:
+            if self._phase == 'practice':
+                self._reset_pressed_on_error()
+
             btn._is_animating = True
 
             Animation.cancel_all(btn, "background_color")
@@ -2502,13 +2542,20 @@ class LessonStudyScreen(BaseScreen):
             btn.background_color = (1, 0.4, 0.4, 1)
 
             original_x = btn.x
-            anim = Animation(x=original_x - dp(10), duration=0.05) + Animation(x=original_x + dp(10),
-                                                                               duration=0.1) + Animation(x=original_x,
-                                                                                                         duration=0.05)
+            anim = (
+                    Animation(x=original_x - dp(10), duration=0.05)
+                    + Animation(x=original_x + dp(10), duration=0.1)
+                    + Animation(x=original_x - dp(10) * 0.6, duration=0.04)
+                    + Animation(x=original_x + dp(10) * 0.6, duration=0.04)
+                    + Animation(x=original_x, duration=0.05)
+            )
 
             def on_anim_complete(*args):
                 btn._is_animating = False
-                self._restore_dot_color(dot_index)
+                btn.background_color = (1, 1, 1, 1)
+
+                if self._phase == 'learn':
+                    self._restore_dot_color(dot_index)
 
             anim.bind(on_complete=on_anim_complete)
             anim.start(btn)
@@ -2529,6 +2576,16 @@ class LessonStudyScreen(BaseScreen):
         if self._is_completed():
             self._go_next()
 
+    def _reset_pressed_on_error(self):
+        self._pressed = [0] * 6
+
+        self._pulse_anims.clear()
+
+        for i in range(6):
+            btn = self._dot_btns[i]
+            Animation.cancel_all(btn, "background_color")
+            btn.background_color = (1, 1, 1, 1)
+
     def _restore_dot_color(self, dot_index: int):
         if self._locked or not self.is_learning_active:
             return
@@ -2545,14 +2602,15 @@ class LessonStudyScreen(BaseScreen):
         Animation.cancel_all(btn, "background_color")
 
         if self._target_dots[dot_index] and not self._pressed[dot_index]:
-            btn.background_color = (0.7, 0.9, 1.0, 1)
-            anim = (
-                    Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
-                    + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
-            )
-            anim.repeat = True
-            anim.start(btn)
-            self._pulse_anims[dot_index] = anim
+            if self._phase == 'learn':
+                btn.background_color = (0.7, 0.9, 1.0, 1)
+                anim = (
+                        Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
+                        + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+                )
+                anim.repeat = True
+                anim.start(btn)
+                self._pulse_anims[dot_index] = anim
         else:
             btn.background_color = (1, 1, 1, 1)
 
@@ -2711,7 +2769,7 @@ class LessonTestScreen(BaseScreen):
                 btn.font_size = dp(36)
             else:
                 btn.text = a
-                btn.font_name = 'Roboto'
+                btn.font_name = 'BrailleFont'
 
             btn.bind(on_press=lambda inst, correct_char=char: self.check_answer(inst, correct_char))
             grid.add_widget(btn)
