@@ -4057,7 +4057,7 @@ class MemoryGameScreen(BaseScreen):
             card.disabled = False
             card.text = ''
             card.scale_x = 1
-            card.font_name = 'BrailleFont',
+            card.font_name = 'BrailleFont'
             card.font_size = dp(32)
 
         shuffled_cards = self._cards_pool[:]
