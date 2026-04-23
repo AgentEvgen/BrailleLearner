@@ -1959,7 +1959,7 @@ class BaseScreen(Screen):
         self.scheduled_events.clear()
 
     def show_popup(self, title, text="", *, size=(dp(320), dp(240)), auto_dismiss=False,
-                   buttons=(), font_size=dp(20),
+                   buttons=(), font_size=dp(20), font_name=None,
                    padding=dp(20), spacing=dp(12), buttons_height=dp(50), buttons_spacing=dp(10),
                    text_width=None):
 
@@ -1968,6 +1968,7 @@ class BaseScreen(Screen):
         lbl = Label(
             text=text,
             font_size=font_size,
+            font_name=font_name,
             halign="center",
             valign="middle",
             size_hint_y=1,
@@ -1984,6 +1985,7 @@ class BaseScreen(Screen):
 
         popup = Popup(
             title=title,
+            title_font=font_name,
             content=root,
             size_hint=(None, None),
             size=size,
@@ -2001,7 +2003,7 @@ class BaseScreen(Screen):
                 return _
 
             for caption, cb in buttons:
-                b = Button(text=caption)
+                b = Button(text=caption, font_name=font_name)
                 b.bind(on_press=handler(cb))
                 row.add_widget(b)
 
