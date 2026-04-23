@@ -1964,11 +1964,12 @@ class BaseScreen(Screen):
                    text_width=None):
 
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
+        active_font = font_name or 'BrailleFont'
 
         lbl = Label(
             text=text,
             font_size=font_size,
-            font_name=font_name,
+            font_name=active_font,
             halign="center",
             valign="middle",
             size_hint_y=1,
@@ -1985,7 +1986,7 @@ class BaseScreen(Screen):
 
         popup = Popup(
             title=title,
-            title_font=font_name,
+            title_font=active_font,
             content=root,
             size_hint=(None, None),
             size=size,
@@ -2003,7 +2004,7 @@ class BaseScreen(Screen):
                 return _
 
             for caption, cb in buttons:
-                b = Button(text=caption, font_name=font_name)
+                b = Button(text=caption, font_name=active_font)
                 b.bind(on_press=handler(cb))
                 row.add_widget(b)
 
@@ -2022,6 +2023,7 @@ class BaseScreen(Screen):
         return self.show_popup(
             title=self.get_translation("you_won"),
             text=text,
+            font_name='BrailleFont',
             buttons=[
                 (self.get_translation("play_again"), on_again),
                 (self.get_translation("exit_menu"), lambda: self.app.switch_screen("practice_levels")),
@@ -2813,6 +2815,7 @@ class LessonTestScreen(BaseScreen):
 
         self.show_popup(
             title=title,
+            font_name='BrailleFont',
             text=msg,
             size=(dp(340), dp(220)),
             auto_dismiss=False,
@@ -5583,6 +5586,7 @@ class BrailleApp(App):
                 if hasattr(screen, 'quick_review_mode') and screen.quick_review_mode:
                     self.stop_quick_review()
                     self.switch_screen('practice_levels')
+                    return True
                 if current == 'translator':
                     tr = self.get_screen('translator')
                     if tr.braille_input_active:
