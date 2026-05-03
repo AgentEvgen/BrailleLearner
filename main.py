@@ -115,10 +115,9 @@ Builder.load_string('''
 <LessonRow>:
     orientation: 'vertical'
     size_hint_y: None
-    height: root.row_height
+    height: dp(110)
     padding: [dp(12), dp(8), dp(12), dp(8)]
     spacing: dp(4)
-
     canvas.before:
         Color:
             rgba: 0.2, 0.2, 0.2, 1
@@ -126,7 +125,6 @@ Builder.load_string('''
             pos: self.pos
             size: self.size
             radius: [dp(10)]
-
     Label:
         text: root.title
         size_hint_y: None
@@ -137,23 +135,22 @@ Builder.load_string('''
         valign: 'middle'
         bold: True
         text_size: self.width, None
-
     Label:
         text: root.letters_text
         size_hint_y: None
-        height: root.letters_height
+        height: dp(20)
         font_size: dp(14)
         font_name: 'BrailleFont'
         halign: 'left'
-        valign: 'top'
+        valign: 'middle'
         color: (0.75, 0.75, 0.75, 1)
-        text_size: self.width, self.height 
-
+        text_size: self.width, None
+        shorten: True
+        shorten_from: 'right'
     BoxLayout:
         size_hint_y: None
         height: dp(40)
         spacing: dp(8)
-
         Button:
             text: root.btn_text
             size_hint_x: 0.5
@@ -161,7 +158,6 @@ Builder.load_string('''
             font_name: 'BrailleFont'
             disabled: not root.is_unlocked
             on_press: app.get_screen('lessons').open_lesson(root.lesson_index)
-
         Label:
             text: root.status_markup
             font_name: 'BrailleFont'
@@ -2137,50 +2133,6 @@ class LessonRow(BoxLayout):
     btn_text = StringProperty('')
     status_markup = StringProperty('')
     is_unlocked = BooleanProperty(True)
-
-    _height_cache = {}
-
-    row_height = NumericProperty(dp(110))
-    letters_height = NumericProperty(dp(20))
-
-    _pad_y = dp(8) * 2
-    _spacing_y = dp(4) * 2
-    _title_h = dp(24)
-    _buttons_h = dp(40)
-    _min_letters_h = dp(20)
-
-    def on_kv_post(self, base_widget):
-        self.bind(width=self._trigger_recalc)
-        self.bind(letters_text=self._trigger_recalc)
-        Clock.schedule_once(lambda dt: self._recalc_heights(), 0)
-
-    def _trigger_recalc(self, *args):
-        Clock.schedule_once(lambda dt: self._recalc_heights(), 0)
-
-    def _recalc_heights(self):
-        wrap_w = max(1, self.width - dp(12) * 2)
-        fs = int(dp(14))
-        key = (int(wrap_w), self.letters_text, fs)
-
-        cached = self._height_cache.get(key)
-        if cached:
-            letters_h, row_h = cached
-            if self.letters_height != letters_h:
-                self.letters_height = letters_h
-            if self.row_height != row_h:
-                self.row_height = row_h
-            return
-
-        cl = CoreLabel(text=self.letters_text, font_size=dp(14))
-        cl.text_size = (wrap_w, None)
-        cl.refresh()
-
-        letters_h = max(self._min_letters_h, cl.texture.size[1])
-        row_h = self._pad_y + self._spacing_y + self._title_h + letters_h + self._buttons_h
-
-        self._height_cache[key] = (letters_h, row_h)
-        self.letters_height = letters_h
-        self.row_height = row_h
 
 
 class LessonsScreen(BaseScreen):
