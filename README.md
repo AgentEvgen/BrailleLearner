@@ -10,10 +10,9 @@
 ---
 
 ## Скачать
+Нажмите на кнопку ниже, чтобы перейти к последней версии:
 
-[<img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png"
-    alt="Get it on GitHub"
-    height="80">](https://github.com/AgentEvgen/BrailleLearner/releases)
+[![GitHub](https://img.shields.io/badge/GitHub-Download-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/AgentEvgen/BrailleLearner/releases/latest)
 
 ---
 
