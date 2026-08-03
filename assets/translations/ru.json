@@ -80,6 +80,9 @@
     "copy": "Копировать",
     "cut_popup": "Вырезать",
     "paste_popup": "Вставить",
-    "select_all_popup": "Выбрать всё"
+    "select_all_popup": "Выбрать всё",
+    "theme": "Тема",
+    "theme_light": "Светлая тема",
+    "dark_mode": "Темная тема"
   }
 }

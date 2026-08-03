@@ -79,6 +79,9 @@
     "reset_lessons_text": "Вы увѣрены, что хотите сбросить прогрессъ уроковъ и звѣзды?",
     "cut_popup": "Вырѣзать",
     "paste_popup": "Вставить",
-    "select_all_popup": "Выбрать всё"
+    "select_all_popup": "Выбрать всё",
+    "theme": "Тема",
+    "theme_light": "Свѣтлая тема",
+    "dark_mode": "Темная тема"
     }
 }
