@@ -25,8 +25,8 @@ import os
 
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
-font_path = resource_find("assets/Quivira-mod.ttf") or os.path.join(os.path.dirname(__file__), "assets",
-                                                                    "Quivira-mod.ttf")
+font_path = resource_find("assets/Taktu.ttf") or os.path.join(os.path.dirname(__file__), "assets",
+                                                                    "Taktu.ttf")
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
@@ -1691,10 +1691,6 @@ def load_translations():
     valid_codes = [code for code in loaded_translations if code in braille_data]
     loaded_translations = {code: loaded_translations[code] for code in valid_codes}
     loaded_languages = {code: loaded_languages[code] for code in valid_codes}
-
-    if "en" not in loaded_translations:
-        loaded_translations["en"] = {}
-        loaded_languages["en"] = "English"
 
     return loaded_translations, loaded_languages
 
