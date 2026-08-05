@@ -5,6 +5,7 @@ from kivy.core.text import Label as CoreLabel
 from kivy.core.clipboard import Clipboard
 from kivy.resources import resource_find
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.scrollview import ScrollView
 from kivy.core.text import LabelBase
 from kivy.animation import Animation
 from kivy.core.window import Window
@@ -2545,21 +2546,52 @@ class BaseScreen(Screen):
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
         active_font = font_name or 'BrailleFont'
 
+        # ---- pre-fit text so it is already the right size when the popup opens ----
+        if isinstance(padding, (list, tuple)):
+            pad_x = padding[0] if len(padding) > 0 else 20
+            pad_y = padding[1] if len(padding) > 1 else 20
+        else:
+            pad_x = pad_y = padding
+        content_w = size[0] - dp(24)               # popup GridLayout padding (12dp each side)
+        label_w = content_w - 2 * pad_x
+        if text_width is not None:
+            label_w = min(text_width, label_w)
+        label_w = max(label_w, dp(40))
+
+        title_h = 0
+        if title:
+            tcl = CoreLabel(text=title, font_name=active_font, font_size=dp(18))
+            tcl.refresh()
+            title_h = (tcl.texture.size[1] if tcl.texture else 0) + dp(16)
+        container_h = size[1] - dp(24) - title_h - dp(4)
+        avail_h = container_h - 2 * pad_y
+        if buttons:
+            avail_h -= buttons_height + spacing
+        avail_h = max(avail_h, dp(30))
+
+        def _measure_h(fs):
+            cl = CoreLabel(text=text, font_name=active_font, font_size=fs,
+                           text_size=(label_w, None), markup=True)
+            cl.refresh()
+            return cl.texture.size[1] if cl.texture else 0
+
+        fit_fs = font_size
+        for _ in range(24):
+            th = _measure_h(fit_fs)
+            if th <= avail_h or fit_fs <= 9:
+                break
+            fit_fs = max(9, int(fit_fs * (avail_h / float(th))) if th > 0 else 9)
+
         lbl = Label(
             text=text,
-            font_size=font_size,
+            font_size=fit_fs,
             font_name=active_font,
             halign="center",
             valign="middle",
             size_hint_y=1,
-            markup=True, )
-
-        def _sync(*_):
-            w = lbl.width if text_width is None else text_width
-            lbl.text_size = (w, None)
-
-        lbl.bind(size=_sync, text=_sync)
-        _sync()
+            markup=True,
+            shorten=False,
+            text_size=(label_w, None), )
 
         root.add_widget(lbl)
 
@@ -2590,6 +2622,14 @@ class BaseScreen(Screen):
             root.add_widget(row)
 
         popup.open()
+        # rare safety net: only shrink further if the real layout differs
+        def _safety(*_):
+            if lbl.width <= 0 or lbl.height <= 0:
+                return
+            th = lbl.texture_size[1]
+            if th > lbl.height and lbl.font_size > 9:
+                lbl.font_size = max(9, lbl.font_size * (lbl.height / float(th)))
+        Clock.schedule_once(_safety, 0.25)
         return popup
 
     def disable_children(self, widget):
@@ -2881,6 +2921,8 @@ class LessonStudyScreen(BaseScreen):
         for btn in self._dot_btns:
             Animation.cancel_all(btn, "background_color")
             Animation.cancel_all(btn, "x")
+            if hasattr(btn, "_anim_x0") and abs(btn.x - btn._anim_x0) > 0.5:
+                btn.x = btn._anim_x0
             if hasattr(btn, "_is_animating"):
                 btn._is_animating = False
         self._pulse_anims.clear()
@@ -3066,6 +3108,7 @@ class LessonStudyScreen(BaseScreen):
             btn.background_color = (1, 0.47, 0.47, 1)
 
             original_x = btn.x
+            btn._anim_x0 = original_x
             anim = (
                     Animation(x=original_x - dp(10), duration=0.05)
                     + Animation(x=original_x + dp(10), duration=0.1)
@@ -3829,7 +3872,7 @@ class EasyWordsPracticeScreen(BaseScreen):
 
         available_height = grid.height
         row_h = (available_height - dp(5) * (self.OPTIONS_COUNT - 1)) / self.OPTIONS_COUNT
-        row_h = max(dp(60), min(row_h, dp(110)))
+        row_h = max(dp(66), min(row_h, dp(120)))
 
         grid.row_default_height = row_h
         grid.row_force_default = True
@@ -3849,11 +3892,11 @@ class EasyWordsPracticeScreen(BaseScreen):
                 if self.invert_mode:
                     btn.text = self._word_to_braille(ans)
                     btn.font_name = 'BrailleFont'
-                    btn.font_size = min(dp(30), row_h * 0.42)
+                    btn.font_size = min(dp(34), row_h * 0.44)
                 else:
                     btn.text = ans
                     btn.font_name = 'BrailleFont'
-                    btn.font_size = min(dp(22), row_h * 0.28)
+                    btn.font_size = min(dp(26), row_h * 0.30)
 
                 if ans == self.current_word:
                     self.correct_button = btn
