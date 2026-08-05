@@ -790,7 +790,7 @@ Builder.load_string('''
                 cols: 2
                 spacing: dp(10)
                 size_hint: (0.94, None)
-                height: min(self.minimum_height, dp(300))
+                height: min(self.minimum_height, dp(300), self.parent.height - dp(16))
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
                 row_default_height: dp(80)
                 padding: [dp(2), dp(8)]
@@ -857,7 +857,7 @@ Builder.load_string('''
                 cols: 1
                 spacing: dp(8)
                 size_hint: (0.94, None)
-                height: min(self.minimum_height, dp(360))
+                height: min(self.minimum_height, dp(360), self.parent.height - dp(16))
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
                 padding: [dp(14), dp(8), dp(14), 0]
                 row_default_height: dp(80)
@@ -924,7 +924,7 @@ Builder.load_string('''
                 cols: 1
                 spacing: dp(8)
                 size_hint: (0.94, None)
-                height: min(self.minimum_height, dp(360))
+                height: min(self.minimum_height, dp(360), self.parent.height - dp(16))
                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
                 padding: [dp(14), dp(8), dp(14), 0]
                 row_default_height: dp(80)
@@ -2537,6 +2537,10 @@ class BaseScreen(Screen):
                    buttons=(), font_size=dp(20), font_name=None,
                    padding=dp(20), spacing=dp(12), buttons_height=dp(50), buttons_spacing=dp(10),
                    text_width=None):
+
+        w_max = max(dp(240), Window.width * 0.92)
+        h_max = max(dp(200), Window.height * 0.88)
+        size = (min(size[0], w_max), min(size[1], h_max))
 
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
         active_font = font_name or 'BrailleFont'
