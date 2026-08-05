@@ -28,8 +28,8 @@ import os
 
 Config.set('kivy', 'exit_on_escape', '0')
 Config.set('graphics', 'resizable', '1')
-font_path = resource_find("assets/Taktu.ttf") or os.path.join(os.path.dirname(__file__), "assets",
-                                                                    "Taktu.ttf")
+font_path = resource_find("assets/DejaVuSans.ttf") or os.path.join(os.path.dirname(__file__), "assets",
+                                                                    "DejaVuSans.ttf")
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
@@ -2546,13 +2546,12 @@ class BaseScreen(Screen):
         root = BoxLayout(orientation="vertical", padding=padding, spacing=spacing)
         active_font = font_name or 'BrailleFont'
 
-        # ---- pre-fit text so it is already the right size when the popup opens ----
         if isinstance(padding, (list, tuple)):
             pad_x = padding[0] if len(padding) > 0 else 20
             pad_y = padding[1] if len(padding) > 1 else 20
         else:
             pad_x = pad_y = padding
-        content_w = size[0] - dp(24)               # popup GridLayout padding (12dp each side)
+        content_w = size[0] - dp(24)
         label_w = content_w - 2 * pad_x
         if text_width is not None:
             label_w = min(text_width, label_w)
@@ -2622,7 +2621,7 @@ class BaseScreen(Screen):
             root.add_widget(row)
 
         popup.open()
-        # rare safety net: only shrink further if the real layout differs
+
         def _safety(*_):
             if lbl.width <= 0 or lbl.height <= 0:
                 return
