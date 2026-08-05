@@ -3496,6 +3496,7 @@ class PracticeScreen(BaseScreen):
                 btn.height = final_row_height
                 btn.answer_char = ans
                 btn.background_color = self.app.card_color
+                btn.color = self.app.text_color
 
                 if self.invert_mode:
                     if ans in digits_data:
@@ -3839,6 +3840,7 @@ class EasyWordsPracticeScreen(BaseScreen):
                 btn.height = row_h
                 btn.answer_word = ans
                 btn.background_color = self.app.card_color
+                btn.color = self.app.text_color
 
                 if self.invert_mode:
                     btn.text = self._word_to_braille(ans)
@@ -4346,6 +4348,7 @@ class HardPracticeScreen(BaseScreen):
         if hasattr(self.ids, 'no_error_btn'):
             self.ids.no_error_btn.disabled = False
             self.ids.no_error_btn.background_color = self.app.card_color
+            self.ids.no_error_btn.color = self.app.text_color
 
         self.user_input = [0] * 6
 
