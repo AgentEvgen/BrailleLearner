@@ -1,6 +1,6 @@
 from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListProperty, NumericProperty
 from kivy.uix.bubble import Bubble, BubbleContent, BubbleButton
-from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 from kivy.core.text import Label as CoreLabel
 from kivy.core.clipboard import Clipboard
 from kivy.resources import resource_find
@@ -15,6 +15,8 @@ from kivy.config import Config
 from kivy.lang import Builder
 from kivy.clock import Clock
 from kivy.metrics import dp
+from kivy.factory import Factory
+from kivy.graphics.texture import Texture
 from kivy.app import App
 from functools import lru_cache
 import random
@@ -30,134 +32,456 @@ font_path = resource_find("assets/Taktu.ttf") or os.path.join(os.path.dirname(__
 LabelBase.register(name="BrailleFont", fn_regular=font_path)
 
 Builder.load_string('''
+
+<BaseScreen>:
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+<Label>:
+    font_name: 'BrailleFont'
+    color: app.text_color
+    font_size: dp(16)
+
+<-Button>:
+    background_normal: ''
+    background_down: ''
+    background_disabled_normal: ''
+    background_disabled_down: ''
+    border: 0, 0, 0, 0
+    background_color: app.card_color
+    color: app.text_color
+    disabled_color: self.color
+    font_size: dp(17)
+    canvas.before:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(14)]
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(13)]
+    canvas:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            texture: self.texture
+            size: self.texture_size
+            pos: int(self.center_x - self.texture_size[0] / 2.), int(self.center_y - self.texture_size[1] / 2.)
+
+<BaseButton@Button>:
+    font_size: dp(18)
+    bold: True
+    size_hint_y: None
+    height: dp(62)
+    padding: [dp(20), dp(12)]
+    color: app.base_fg if app.theme_tick else app.base_fg
+    disabled_color: 0.9, 0.92, 0.98, 1
+    canvas.before:
+        Color:
+            rgba: (0.65, 0.68, 0.75, 1) if self.disabled else (1, 1, 1, 1)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+            texture: app.btn_gradient
+
+<TabButton@Button>:
+    font_size: dp(17)
+    canvas.before:
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [self.height / 2]
+
+<-DotButton@Button>:
+    size_hint: None, None
+    background_color: app.card_color
+    text: ''
+    font_size: dp(24)
+    canvas.before:
+        Color:
+            rgba: app.dot_ring_color
+        Ellipse:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: self.background_color
+        Ellipse:
+            pos: self.x + dp(2), self.y + dp(2)
+            size: self.width - dp(4), self.height - dp(4)
+
+<ScrollView>:
+    bar_width: dp(3)
+    bar_color: app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.35
+    bar_inactive_color: app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.12
+    bar_margin: dp(2)
+
+<-TextInput>:
+    background_normal: ''
+    background_active: ''
+    background_disabled_normal: ''
+    background_disabled_active: ''
+    background_color: app.field_color
+    foreground_color: app.accent_color
+    disabled_foreground_color: 0.62, 0.60, 0.85, 1
+    hint_text_color: 0.62, 0.66, 0.74, 1
+    cursor_color: app.accent_color
+    selection_color: app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.22
+    font_size: dp(17)
+    padding: [dp(14), dp(12)]
+    canvas.before:
+        Color:
+            rgba: (app.accent_color) if self.focus else (app.border_color)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(14)]
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(13)]
+        Color:
+            rgba:
+                (self.cursor_color if self.focus and not self._cursor_blink
+                and int(self.x + self.padding[0]) <= self._cursor_visual_pos[0] <= int(self.x + self.width - self.padding[2])
+                else (0, 0, 0, 0))
+        Rectangle:
+            pos: self._cursor_visual_pos
+            size: root.cursor_width, -self._cursor_visual_height
+        Color:
+            rgba: self.disabled_foreground_color if self.disabled else (self.hint_text_color if not self.text else self.foreground_color)
+
+<-Spinner>:
+    background_normal: ''
+    background_down: ''
+    background_disabled_normal: ''
+    background_color: app.field_color
+    color: app.text_color
+    font_size: dp(16)
+    canvas.before:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(14)]
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(13)]
+    canvas:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            texture: self.texture
+            size: self.texture_size
+            pos: int(self.center_x - self.texture_size[0] / 2.), int(self.center_y - self.texture_size[1] / 2.)
+
+<SpinnerOption>:
+    size_hint_y: None
+    height: dp(46)
+    background_normal: ''
+    background_down: ''
+    background_color: app.field_color
+    color: app.text_color
+    font_size: dp(16)
+
+<-Switch>:
+    active_norm_pos: max(0., min(1., (int(self.active) + self.touch_distance / sp(41))))
+    canvas:
+        Color:
+            rgba: (app.accent_color) if self.active else (app.track_color)
+        RoundedRectangle:
+            size: dp(54), dp(30)
+            pos: int(self.center_x - dp(27)), int(self.center_y - dp(15))
+            radius: [dp(15)]
+        Color:
+            rgba: 1, 1, 1, 1
+        Ellipse:
+            size: dp(24), dp(24)
+            pos: int(self.center_x - dp(27) + dp(3) + self.active_norm_pos * dp(24)), int(self.center_y - dp(12))
+
+<-ModalView>:
+    background: ''
+    overlay_color: app.overlay_color
+    canvas:
+        Color:
+            rgba: root.overlay_color[:3] + [root.overlay_color[-1] * self._anim_alpha]
+        Rectangle:
+            size: self._window.size if self._window else (0, 0)
+
+<Popup>:
+    _container: container
+    title_color: app.text_color
+    title_size: dp(18)
+    title_align: 'center'
+    separator_color: 0.31, 0.275, 0.898, 0.35
+    separator_height: dp(1)
+    canvas:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(22)]
+        Color:
+            rgba: app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(21)]
+
+    GridLayout:
+        padding: '12dp'
+        cols: 1
+        size_hint: None, None
+        pos: root.pos
+        size: root.size
+
+        Label:
+            text: root.title
+            color: root.title_color
+            size_hint_y: None
+            height: self.texture_size[1] + dp(16)
+            text_size: self.width - dp(16), None
+            font_size: root.title_size
+            font_name: root.title_font
+            halign: root.title_align
+
+        Widget:
+            size_hint_y: None
+            height: dp(4)
+            canvas:
+                Color:
+                    rgba: root.separator_color
+                Rectangle:
+                    pos: self.x, self.y + root.separator_height / 2.
+                    size: self.width, root.separator_height
+
+        BoxLayout:
+            id: container
+
 <StreakHeader@BoxLayout>:
     orientation: 'horizontal'
     size_hint_y: None
-    height: dp(45)
-    spacing: dp(5)
+    height: dp(52)
+    spacing: dp(8)
     streak_text: ''
     time_left: 0
     quick_review_mode: False
 
     Label:
         text: root.streak_text.split('\\n')[0] if '\\n' in root.streak_text else root.streak_text
-        font_size: dp(16)
+        font_size: dp(17)
+        color: app.text_soft_color
         halign: 'left'
         valign: 'middle'
         size_hint_x: 0.4
+        text_size: self.size
 
     Label:
         text: str(root.time_left) if root.quick_review_mode else ''
-        font_size: dp(20)
-        halign: 'right'
-        size_hint_x: 0.0001
+        font_size: dp(28)
+        bold: True
+        color: app.accent_color
+        halign: 'center'
+        valign: 'middle'
+        size_hint_x: 0.2
+        text_size: self.size
 
     Label:
         text: root.streak_text.split('\\n')[1] if '\\n' in root.streak_text else ''
-        font_size: dp(16)
+        font_size: dp(17)
+        color: app.text_soft_color
         halign: 'right'
         valign: 'middle'
         size_hint_x: 0.4
-
-<BaseButton@Button>:
-    font_size: dp(22)
-    size_hint_y: None
-    height: dp(80)
-    padding: dp(10), dp(10)
+        text_size: self.size
 
 <MenuScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
-        spacing: dp(8)
+        padding: [dp(24), dp(30), dp(24), dp(16)]
+        spacing: dp(4)
+
+        Widget:
+            size_hint_y: None
+            height: dp(10)
+
         Label:
             text: root.menu_title
-            font_size: dp(26)
             font_name: 'BrailleFont'
-            size_hint_y: None
-            height: dp(45)
+            font_size: dp(38)
+            bold: True
+            color: app.text_color
             halign: 'center'
             valign: 'middle'
+            size_hint_y: None
+            height: dp(54)
+            text_size: self.width, None
+
+        Label:
+            text: root.menu_braille
+            font_name: 'BrailleFont'
+            font_size: dp(20)
+            color: app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.6
+            halign: 'center'
+            valign: 'middle'
+            size_hint_y: None
+            height: dp(30)
+            text_size: self.width, None
+            shorten: True
+            shorten_from: 'right'
+
+        Widget:
+            size_hint_y: None
+            height: dp(16)
+
+        Widget:
+            size_hint_y: None
+            height: dp(2)
+            canvas:
+                Color:
+                    rgba: app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.28
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(1)]
+
+        Widget:
+            size_hint_y: None
+            height: dp(22)
+
         ScrollView:
             size_hint_y: 1
-            bar_width: dp(6)
-            bar_inactive_color: [0.6, 0.6, 0.6, 1]
+            do_scroll_x: False
+
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
-                padding: [dp(20), dp(10)]
-                spacing: dp(15)
-                BaseButton:
+                spacing: dp(12)
+                padding: [dp(2), dp(4), dp(2), dp(4)]
+
+                Button:
                     text: root.training_title
                     font_name: 'BrailleFont'
+                    font_size: dp(20)
+                    size_hint_y: None
+                    height: dp(62)
                     on_press: app.switch_screen('lessons')
-                BaseButton:
+
+                Button:
                     text: root.practice
                     font_name: 'BrailleFont'
+                    font_size: dp(20)
+                    size_hint_y: None
+                    height: dp(62)
                     on_press: app.switch_screen('practice_levels')
-                BaseButton:
+
+                Button:
                     text: root.reference_title
                     font_name: 'BrailleFont'
+                    font_size: dp(20)
+                    size_hint_y: None
+                    height: dp(62)
                     on_press: app.switch_screen('reference')
-                BaseButton:
+
+                Button:
                     text: root.translator_title
                     font_name: 'BrailleFont'
+                    font_size: dp(20)
+                    size_hint_y: None
+                    height: dp(62)
                     on_press: app.switch_screen('translator')
-                BaseButton:
+
+                Button:
                     text: root.settings_title
                     font_name: 'BrailleFont'
+                    font_size: dp(20)
+                    size_hint_y: None
+                    height: dp(62)
                     on_press: app.switch_screen('settings')
+
         Widget:
             size_hint_y: None
-            height: dp(15)
+            height: dp(8)
 
 <LessonRow>:
     orientation: 'vertical'
     size_hint_y: None
-    height: dp(110)
-    padding: [dp(12), dp(8), dp(12), dp(8)]
-    spacing: dp(4)
+    height: dp(132)
+    padding: [dp(16), dp(10), dp(16), dp(10)]
+    spacing: dp(10)
+
     canvas.before:
         Color:
-            rgba: 0.2, 0.2, 0.2, 1
+            rgba: app.locked_border if not root.is_unlocked else app.border_color
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(10)]
+            radius: [dp(18)]
+        Color:
+            rgba: app.locked_bg if not root.is_unlocked else app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(17)]
+
     Label:
         text: root.title
         size_hint_y: None
         height: dp(24)
-        font_size: dp(17)
+        font_size: dp(18)
         font_name: 'BrailleFont'
         halign: 'left'
         valign: 'middle'
         bold: True
+        color: app.text_soft_color if not root.is_unlocked else app.text_color
         text_size: self.width, None
+
     Label:
         text: root.letters_text
         size_hint_y: None
         height: dp(20)
-        font_size: dp(14)
+        font_size: dp(15)
         font_name: 'BrailleFont'
         halign: 'left'
         valign: 'middle'
-        color: (0.75, 0.75, 0.75, 1)
+        color: app.locked_text if not root.is_unlocked else app.text_soft_color
         text_size: self.width, None
         shorten: True
         shorten_from: 'right'
+
     BoxLayout:
         size_hint_y: None
-        height: dp(40)
-        spacing: dp(8)
-        Button:
+        height: dp(48)
+        spacing: dp(10)
+
+        BaseButton:
             text: root.btn_text
             size_hint_x: 0.5
-            font_size: dp(15)
+            height: dp(48)
+            font_size: dp(16)
             font_name: 'BrailleFont'
             disabled: not root.is_unlocked
             on_press: app.get_screen('lessons').open_lesson(root.lesson_index)
+
         Label:
             text: root.status_markup
             font_name: 'BrailleFont'
@@ -165,46 +489,73 @@ Builder.load_string('''
             size_hint_x: 0.5
             halign: 'right'
             valign: 'middle'
-            font_size: dp(14)
-            font_name: 'BrailleFont'
+            font_size: dp(16)
             text_size: self.size
 
 <LessonsScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
-        spacing: dp(10)
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
-        Label:
-            text: root.lessons_title
-            font_name: 'BrailleFont'
-            font_size: dp(26)
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(50)
-            halign: 'center'
-            valign: 'middle'
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('menu')
+
+            Label:
+                text: root.lessons_title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
         BoxLayout:
             size_hint_y: None
-            height: dp(50)
-            spacing: dp(10)
-            padding: [dp(10), 0]
+            height: dp(56)
+            spacing: dp(4)
+            padding: dp(4)
 
-            Button:
+            canvas.before:
+                Color:
+                    rgba: app.track_color
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(17)]
+
+            TabButton:
                 text: root.letters_tab_text
                 font_name: 'BrailleFont'
-                background_color: (1.5, 1.5, 1.5, 1) if root.current_mode == 'letters' else (1, 1, 1, 1)
+                color: (1, 1, 1, 1) if root.current_mode == 'letters' else (app.text_soft_color)
+                background_color: (app.accent_color) if root.current_mode == 'letters' else (0, 0, 0, 0)
                 on_press: root.switch_mode('letters')
 
-            Button:
+            TabButton:
                 text: root.digits_tab_text
                 font_name: 'BrailleFont'
-                background_color: (1.5, 1.5, 1.5, 1) if root.current_mode == 'digits' else (1, 1, 1, 1)
+                color: (1, 1, 1, 1) if root.current_mode == 'digits' else (app.text_soft_color)
+                background_color: (app.accent_color) if root.current_mode == 'digits' else (0, 0, 0, 0)
                 on_press: root.switch_mode('digits')
 
         RecycleView:
             id: lessons_rv
-            bar_width: dp(8)
+            bar_width: dp(3)
             viewclass: 'LessonRow'
             scroll_type: ['bars', 'content']
             do_scroll_x: False
@@ -213,130 +564,56 @@ Builder.load_string('''
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
-                spacing: dp(8)
-                padding: [dp(10), dp(10)]
-                default_size: None, dp(110)
+                spacing: dp(10)
+                padding: [dp(2), dp(6)]
+                default_size: None, dp(132)
                 default_size_hint: 1, None
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: app.switch_screen('menu')
 
 <LessonStudyScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(15)
-        spacing: dp(12)
-
-        Label:
-            text: root.lesson_title
-            font_size: dp(20)
-            font_name: 'BrailleFont'
-            size_hint_y: None
-            height: dp(42)
-            text_size: self.width, None
-            halign: 'center'
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
         BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: 0.8
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(54)
+            spacing: dp(10)
 
-            BoxLayout:
-                id: study_panel
-                orientation: 'vertical'
-                opacity: 1 if root.is_learning_active else 0
-                disabled: not root.is_learning_active
-                size_hint_y: None
-                height: self.parent.height if root.is_learning_active else 0
+            BaseButton:
+                id: back_finish_btn
+                text: root.back_btn if root.is_learning_active else root.finish_btn_text
+                font_name: 'BrailleFont'
+                font_size: dp(16)
+                size_hint_x: None
+                width: dp(160)
+                height: dp(50)
+                on_press: app.switch_screen('lessons') if root.is_learning_active else root.finish_lesson()
 
-                Label:
-                    id: study_symbol
-                    text: root.current_symbol
-                    font_name: 'BrailleFont'
-                    font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
-                    size_hint_y: 0.35
-                    halign: 'center'
-                    valign: 'middle'
-                    text_size: self.size
+            Label:
+                text: root.lesson_title
+                font_name: 'BrailleFont'
+                font_size: dp(22)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
-                FloatLayout:
-                    size_hint_y: 0.65
-
-                    GridLayout:
-                        id: dots_grid
-                        cols: 2
-                        rows: 3
-                        spacing: [dp(20), dp(20)]
-                        padding: dp(10)
-                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-                        size_hint: None, None
-                        width: self.minimum_width
-                        height: self.minimum_height
-
-                        Button:
-                            id: d1
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(0)
-
-                        Button:
-                            id: d4
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(3)
-
-                        Button:
-                            id: d2
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(1)
-
-                        Button:
-                            id: d5
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(4)
-
-                        Button:
-                            id: d3
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(2)
-
-                        Button:
-                            id: d6
-                            text: '*'
-                            font_size: dp(24)
-                            width: dp(70)
-                            height: dp(70)
-                            size_hint: None, None
-                            on_press: root.on_dot_press(5)
+        FloatLayout:
+            size_hint_y: 1
 
             ScrollView:
                 id: letters_scroll
-                bar_width: dp(8)
+                bar_width: dp(3)
+                size_hint: 1, 1
+                pos_hint: {'pos': (0, 0)}
                 opacity: 1 if not root.is_learning_active else 0
                 scroll_y: 1.0
                 disabled: root.is_learning_active
-                size_hint_y: None
-                height: self.parent.height if not root.is_learning_active else 0
 
                 GridLayout:
                     id: letters_grid
@@ -344,165 +621,335 @@ Builder.load_string('''
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: dp(10)
-                    padding: [dp(10), dp(5), dp(10), dp(5)]
-                    row_default_height: dp(80)
+                    padding: [dp(4), dp(4), dp(4), dp(4)]
+                    row_default_height: dp(84)
                     valign: 'top'
 
-        BoxLayout:
-            size_hint_y: None
-            height: dp(60)
-            spacing: dp(10)
+            BoxLayout:
+                id: study_panel
+                orientation: 'vertical'
+                size_hint: 1, 1
+                pos_hint: {'pos': (0, 0)}
+                spacing: dp(10)
+                opacity: 1 if root.is_learning_active else 0
+                disabled: not root.is_learning_active
 
-            BaseButton:
-                id: back_finish_btn
-                text: root.back_btn if root.is_learning_active else root.finish_btn_text
-                font_name: 'BrailleFont'
-                height: dp(50)
-                on_press: app.switch_screen('lessons') if root.is_learning_active else root.finish_lesson()
+                BoxLayout:
+                    size_hint_y: 0.4
+                    padding: dp(18)
+
+                    canvas.before:
+                        Color:
+                            rgba: app.border_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(24)]
+                        Color:
+                            rgba: app.card_color
+                        RoundedRectangle:
+                            pos: self.x + dp(1), self.y + dp(1)
+                            size: self.width - dp(2), self.height - dp(2)
+                            radius: [dp(23)]
+
+                    Label:
+                        id: study_symbol
+                        text: root.current_symbol
+                        font_name: 'BrailleFont'
+                        font_size: min(dp(84), self.height * 0.55) if self.height > 0 else dp(40)
+                        color: app.accent_color
+                        halign: 'center'
+                        valign: 'middle'
+                        text_size: self.size
+
+                FloatLayout:
+                    size_hint_y: 0.6
+
+                    GridLayout:
+                        id: dots_grid
+                        cols: 2
+                        rows: 3
+                        spacing: [dp(22), dp(22)]
+                        padding: dp(12)
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        size_hint: None, None
+                        width: self.minimum_width
+                        height: self.minimum_height
+
+                        DotButton:
+                            id: d1
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(0)
+
+                        DotButton:
+                            id: d4
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(3)
+
+                        DotButton:
+                            id: d2
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(1)
+
+                        DotButton:
+                            id: d5
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(4)
+
+                        DotButton:
+                            id: d3
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(2)
+
+                        DotButton:
+                            id: d6
+                            width: dp(72)
+                            height: dp(72)
+                            on_press: root.on_dot_press(5)
 
 <LessonTestScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(12)
-        spacing: dp(10)
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
-        Label:
-            text: root.test_title
-            font_name: 'BrailleFont'
-            font_size: dp(22)
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(42)
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('lessons')
+
+            Label:
+                text: root.test_title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
         Label:
             text: root.counter_label
             font_name: 'BrailleFont'
-            font_size: dp(16)
+            font_size: dp(15)
+            color: app.text_soft_color
             size_hint_y: None
-            height: dp(28)
-
-        Label:
-            text: root.prompt_text
-            font_name: 'BrailleFont'
-            font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
-            size_hint_y: 0.35
+            height: dp(24)
             halign: 'center'
             valign: 'middle'
 
-        GridLayout:
-            id: answers_grid
-            cols: 2
-            spacing: dp(8)
-            size_hint_y: 0.45
-            row_default_height: dp(72)
-            padding: dp(6)
-
         BoxLayout:
-            size_hint_y: None
-            height: dp(56)
-            spacing: dp(8)
+            size_hint_y: 0.34
+            padding: dp(18)
 
-            BaseButton:
-                text: root.back_btn
-                font_name: 'BrailleFont'
-                height: dp(50)
-                on_press: app.switch_screen('lessons')
-
-<PracticeScreen>:
-    BoxLayout:
-        orientation: 'vertical'
-        padding: dp(10)
-        spacing: dp(10)
-        BoxLayout:
-            orientation: 'horizontal'
-            size_hint_y: None
-            height: dp(45)
-            spacing: dp(5)
-            StreakHeader:
-                streak_text: root.streak_text
-                font_name: 'BrailleFont'
-                time_left: root.time_left
-                quick_review_mode: root.quick_review_mode
-
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: 0.3
-            padding: dp(10)
-            Label:
-                text: root.braille_char
-                font_name: 'BrailleFont'
-                font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
-                size_hint: (0.8, 0.8)
-                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-        GridLayout:
-            id: answers_grid
-            cols: 1
-            spacing: dp(5)
-            size_hint_y: 0.6
-            padding: [dp(20), 0, dp(20), 0]
-            row_default_height: dp(80)
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: root.exit_to_practice_levels()
-
-<EasyWordsPracticeScreen>:
-    BoxLayout:
-        orientation: 'vertical'
-        padding: dp(10)
-        spacing: dp(10)
-
-        BoxLayout:
-            orientation: 'horizontal'
-            size_hint_y: None
-            height: dp(45)
-            spacing: dp(5)
-            StreakHeader:
-                streak_text: root.streak_text
-                font_name: 'BrailleFont'
-                time_left: root.time_left
-                quick_review_mode: root.quick_review_mode
-
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: 0.3
-            padding: dp(10)
+            canvas.before:
+                Color:
+                    rgba: app.border_color
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(24)]
+                Color:
+                    rgba: app.card_color
+                RoundedRectangle:
+                    pos: self.x + dp(1), self.y + dp(1)
+                    size: self.width - dp(2), self.height - dp(2)
+                    radius: [dp(23)]
 
             Label:
                 text: root.prompt_text
                 font_name: 'BrailleFont'
-                font_size: min(dp(56), self.height * 0.42) if self.height > 0 else dp(32)
-                size_hint: (0.95, 0.95)
-                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                font_size: min(dp(80), self.height * 0.55) if self.height > 0 else dp(40)
+                color: app.accent_color
                 halign: 'center'
                 valign: 'middle'
                 text_size: self.size
 
-        GridLayout:
-            id: answers_grid
-            cols: 1
-            spacing: dp(5)
-            size_hint_y: 0.6
-            padding: [dp(20), 0, dp(20), 0]
-            row_default_height: dp(80)
+        FloatLayout:
+            size_hint_y: 1
 
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: root.exit_to_practice_levels()
+            GridLayout:
+                id: answers_grid
+                cols: 2
+                spacing: dp(10)
+                size_hint: (0.94, None)
+                height: min(self.minimum_height, dp(300))
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                row_default_height: dp(80)
+                padding: [dp(2), dp(8)]
 
-<MediumPracticeScreen>:
+<PracticeScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(10)
-        spacing: dp(10)
+        spacing: dp(6)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
         BoxLayout:
             orientation: 'horizontal'
             size_hint_y: None
-            height: dp(45)
-            spacing: dp(5)
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: root.exit_to_practice_levels()
+
+            StreakHeader:
+                streak_text: root.streak_text
+                time_left: root.time_left
+                quick_review_mode: root.quick_review_mode
+
+        BoxLayout:
+            size_hint_y: 0.3
+            padding: dp(18)
+
+            canvas.before:
+                Color:
+                    rgba: app.border_color
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(26)]
+                Color:
+                    rgba: app.card_color
+                RoundedRectangle:
+                    pos: self.x + dp(1), self.y + dp(1)
+                    size: self.width - dp(2), self.height - dp(2)
+                    radius: [dp(25)]
+
+            Label:
+                text: root.braille_char
+                font_name: 'BrailleFont'
+                font_size: min(dp(96), self.height * 0.6) if self.height > 0 else dp(44)
+                color: app.accent_color
+                halign: 'center'
+                valign: 'middle'
+                text_size: self.size
+                size_hint: 1, 1
+
+        FloatLayout:
+            size_hint_y: 1
+
+            GridLayout:
+                id: answers_grid
+                cols: 1
+                spacing: dp(8)
+                size_hint: (0.94, None)
+                height: min(self.minimum_height, dp(360))
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                padding: [dp(14), dp(8), dp(14), 0]
+                row_default_height: dp(80)
+
+<EasyWordsPracticeScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        spacing: dp(6)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: root.exit_to_practice_levels()
+
+            StreakHeader:
+                streak_text: root.streak_text
+                time_left: root.time_left
+                quick_review_mode: root.quick_review_mode
+
+        BoxLayout:
+            size_hint_y: 0.3
+            padding: dp(18)
+
+            canvas.before:
+                Color:
+                    rgba: app.border_color
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(26)]
+                Color:
+                    rgba: app.card_color
+                RoundedRectangle:
+                    pos: self.x + dp(1), self.y + dp(1)
+                    size: self.width - dp(2), self.height - dp(2)
+                    radius: [dp(25)]
+
+            Label:
+                text: root.prompt_text
+                font_name: 'BrailleFont'
+                font_size: min(dp(62), self.height * 0.42) if self.height > 0 else dp(32)
+                color: app.accent_color
+                halign: 'center'
+                valign: 'middle'
+                text_size: self.size
+                size_hint: 1, 1
+
+        FloatLayout:
+            size_hint_y: 1
+
+            GridLayout:
+                id: answers_grid
+                cols: 1
+                spacing: dp(8)
+                size_hint: (0.94, None)
+                height: min(self.minimum_height, dp(360))
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                padding: [dp(14), dp(8), dp(14), 0]
+                row_default_height: dp(80)
+
+<MediumPracticeScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        spacing: dp(6)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: root.exit_to_practice_levels()
+
             StreakHeader:
                 streak_text: root.streak_text
                 time_left: root.time_left
@@ -511,15 +958,17 @@ Builder.load_string('''
         Label:
             text: root.current_letter
             font_name: 'BrailleFont'
-            font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
-            size_hint_y: 0.15
+            font_size: min(dp(84), self.height * 0.6) if self.height > 0 else dp(44)
+            color: app.accent_color
+            size_hint_y: 0.2
             halign: 'center'
             valign: 'middle'
+            text_size: self.size
 
         BoxLayout:
             orientation: 'vertical'
-            size_hint_y: 0.4
-            spacing: dp(15)
+            size_hint_y: 0.5
+            spacing: dp(14)
 
             GridLayout:
                 cols: 2
@@ -531,116 +980,102 @@ Builder.load_string('''
                 height: self.minimum_height
                 pos_hint: {'center_x': 0.5}
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(0, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot1
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(3, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot4
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(1, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot2
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(4, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot5
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(2, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot3
 
-                Button:
-                    text: '*'
-                    font_size: dp(24)
-                    width: dp(70)
-                    height: dp(70)
-                    size_hint: None, None
+                DotButton:
                     on_press: root.on_dot_press(5, self)
                     background_disabled_normal: self.background_normal
                     background_disabled_down: self.background_down
+                    width: dp(72)
+                    height: dp(72)
                     id: dot6
 
         BoxLayout:
             orientation: 'horizontal'
-            size_hint_y: 0.15
-            spacing: dp(30)
-            padding: [dp(40), 0]
+            size_hint_y: 0.13
+            spacing: dp(14)
+            padding: [dp(16), 0]
 
             BaseButton:
                 id: confirm_btn
                 text: root.confirm_btn
                 font_name: 'BrailleFont'
-                size_hint: 0.45, None
-                height: dp(50)
+                size_hint: 0.5, None
+                height: dp(56)
                 on_press: root.confirm_answer()
                 background_disabled_normal: self.background_normal
                 background_disabled_down: self.background_down
 
-            BaseButton:
+            Button:
                 id: hint_btn
                 text: root.hint_btn
                 font_name: 'BrailleFont'
-                size_hint: 0.45, None
-                height: dp(50)
+                size_hint: 0.5, None
+                height: dp(56)
                 on_press: root.show_hint()
                 background_disabled_normal: self.background_normal
                 background_disabled_down: self.background_down
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: root.exit_to_practice_levels()
 
 <HardPracticeScreen>:
     FloatLayout:
         BoxLayout:
             orientation: 'vertical'
-            padding: dp(10)
-            spacing: dp(10)
+            spacing: dp(6)
+            padding: [dp(18), dp(12), dp(18), dp(14)]
 
             BoxLayout:
                 orientation: 'horizontal'
                 size_hint_y: None
-                height: dp(45)
-                spacing: dp(5)
+                height: dp(54)
+                spacing: dp(10)
+
+                Button:
+                    text: root.back_btn
+                    font_name: 'BrailleFont'
+                    size_hint_x: None
+                    width: dp(104)
+                    height: dp(50)
+                    font_size: dp(16)
+                    on_press: root.exit_to_practice_levels()
+
                 StreakHeader:
                     streak_text: root.streak_text
                     time_left: root.time_left
@@ -651,67 +1086,72 @@ Builder.load_string('''
                 text: root.current_word_text
                 font_name: 'BrailleFont'
                 font_size: min(dp(72), self.height * 0.6) if self.height > 0 else dp(40)
-                size_hint_y: 0.25
+                color: app.accent_color
+                size_hint_y: 0.22
                 halign: 'center'
                 valign: 'middle'
+                text_size: self.size
 
             BoxLayout:
                 id: braille_word_box
                 orientation: 'horizontal'
-                size_hint_y: 0.2
+                size_hint_y: 0.16
                 size_hint_x: None
                 width: self.minimum_width
-                spacing: dp(5)
-                padding: dp(5)
+                spacing: dp(8)
+                padding: dp(6)
                 pos_hint: {'center_x': 0.5}
 
             Widget:
-                size_hint_y: 0.3
+                size_hint_y: 0.32
 
             BoxLayout:
                 orientation: 'vertical'
-                size_hint_y: 0.15
+                size_hint_y: 0.14
                 spacing: dp(10)
                 padding: [dp(40), 0]
-                BaseButton:
+
+                Button:
                     id: no_error_btn
                     text: root.no_errors_btn
                     font_name: 'BrailleFont'
                     on_press: root.on_no_error_press()
-                    height: dp(50)
+                    height: dp(56)
                     background_disabled_normal: self.background_normal
-
-            BaseButton:
-                text: root.back_btn
-                font_name: 'BrailleFont'
-                height: dp(50)
-                on_press: root.exit_to_practice_levels()
+                    background_disabled_down: self.background_down
 
         BoxLayout:
             id: correction_panel
             orientation: 'vertical'
-            size_hint: (0.8, None)
+            size_hint: None, None
+            width: dp(340)
             height: self.minimum_height
-            pos_hint: {'center_x': 0.5, 'y': 0.2} if root.correction_panel_visible else {'x': 2}
+            pos_hint: {'center_x': 0.5, 'y': 0.18} if root.correction_panel_visible else {'x': 2}
 
             opacity: 1 if root.correction_panel_visible else 0
             disabled: not root.correction_panel_visible
 
-            padding: dp(20) 
-            spacing: dp(15)
+            padding: dp(20)
+            spacing: dp(16)
 
             canvas.before:
                 Color:
-                    rgba: 0.2, 0.2, 0.2, 0.95 if self.opacity > 0 else 0
+                    rgba: app.border_color[0], app.border_color[1], app.border_color[2], 0.97 if self.opacity > 0 else 0
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
-                    radius: [dp(15)]
+                    radius: [dp(20)]
+                Color:
+                    rgba: app.card_color[0], app.card_color[1], app.card_color[2], 0.97 if self.opacity > 0 else 0
+                RoundedRectangle:
+                    pos: self.x + dp(1), self.y + dp(1)
+                    size: self.width - dp(2), self.height - dp(2)
+                    radius: [dp(19)]
 
             GridLayout:
                 cols: 2
                 rows: 3
-                spacing: dp(20)
+                spacing: dp(18)
                 size_hint: None, None
                 width: self.minimum_width
                 height: self.minimum_height
@@ -722,15 +1162,16 @@ Builder.load_string('''
                 text: root.confirm_btn
                 font_name: 'BrailleFont'
                 size_hint: 0.6, None
-                height: dp(50)
+                height: dp(56)
                 pos_hint: {'center_x': 0.5}
                 on_press: root.confirm_correction()
 
 <MemoryCard>:
     font_size: dp(42)
     background_normal: ''
-    background_disabled_normal: ''
     background_down: ''
+    background_disabled_normal: ''
+    background_disabled_down: ''
     scale_x: 1
 
     canvas.before:
@@ -741,153 +1182,130 @@ Builder.load_string('''
 
         Color:
             rgba:
-                (0.20, 0.20, 0.20, 1) if self.face_down else (
-                (0.20, 0.65, 0.20, 1) if self.is_matched else
-                (0.30, 0.30, 0.30, 1))
-
+                (app.mem_back_color) if self.face_down else (
+                (app.ws_found_bg) if self.is_matched else
+                (app.card_color))
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(12)]
-
-        Color:
-            rgba: (0.35, 0.35, 0.35, 1) if self.face_down else (0.45, 0.45, 0.45, 1)
-        Line:
-            rounded_rectangle: (self.x, self.y, self.width, self.height, dp(12))
-            width: dp(1)
+            radius: [dp(16)]
 
     canvas.after:
         PopMatrix
 
-    color: (1, 1, 1, 1) if not self.face_down else (1, 1, 1, 0)
+    color: (app.text_color) if not self.face_down else (1, 1, 1, 0)
     on_press: root.on_card_click()
 
 <MemoryGameScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
-        spacing: dp(10)
-
-        canvas.before:
-            Color:
-                rgba: 1, 1, 1, 0
-            Rectangle:
-                pos: self.pos
-                size: self.size
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
         BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(50)
+            height: dp(54)
+            spacing: dp(10)
 
-            Label:
-                text: root.game_title
+            Button:
+                text: root.back_btn
                 font_name: 'BrailleFont'
-                font_size: dp(22)
-                bold: True
-                halign: 'left'
-                size_hint_x: 0.6
-                text_size: self.size
-                valign: 'middle'
-                color: (0.9, 0.9, 0.9, 1)
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('practice_levels')
 
             Label:
                 text: root.moves_label
                 font_name: 'BrailleFont'
                 font_size: dp(18)
+                color: app.text_soft_color
                 halign: 'right'
-                size_hint_x: 0.4
-                text_size: self.size
                 valign: 'middle'
-                color: (0.7, 0.7, 0.7, 1)
-
-        Widget:
-            size_hint_y: None
-            height: dp(2)
-            canvas:
-                Color:
-                    rgba: 0.3, 0.3, 0.3, 1
-                Rectangle:
-                    pos: self.x, self.center_y
-                    size: self.width, dp(1)
+                size_hint_x: 1
+                text_size: self.size
 
         GridLayout:
             id: memory_grid
             cols: 4
             spacing: dp(10)
-            padding: [dp(5), dp(10)]
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: app.switch_screen('practice_levels')
-
+            padding: [dp(2), dp(8)]
+            size_hint_y: 1
 
 <BrailleWordSearchScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
-        spacing: dp(10)
+        spacing: dp(6)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
         BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(50)
+            height: dp(54)
+            spacing: dp(10)
 
-            Label:
-                text: root.title
+            Button:
+                text: root.back_btn
                 font_name: 'BrailleFont'
-                font_size: dp(22)
-                bold: True
-                halign: 'left'
-                text_size: self.size
-                valign: 'middle'
-                size_hint_x: 0.65
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('practice_levels')
 
             Label:
                 text: root.status_text
                 font_name: 'BrailleFont'
-                font_size: dp(16)
+                font_size: dp(18)
+                color: app.text_soft_color
                 halign: 'right'
-                text_size: self.size
                 valign: 'middle'
-                size_hint_x: 0.35
-
-        Widget:
-            size_hint_y: None
-            height: dp(2)
-            canvas:
-                Color:
-                    rgba: 0.3, 0.3, 0.3, 1
-                Rectangle:
-                    pos: self.x, self.center_y
-                    size: self.width, dp(1)
-
+                size_hint_x: 1
+                text_size: self.size
 
         GridLayout:
             id: ws_grid
             cols: root.grid_size
             spacing: dp(4)
-            padding: [dp(8), dp(8)]
-            size_hint_y: 0.65
+            padding: [dp(2), dp(4)]
+            size_hint_y: 0.78
 
         BoxLayout:
             orientation: 'vertical'
-            size_hint_y: 0.30
+            size_hint_y: 0.22
             spacing: dp(6)
-            padding: [dp(8), 0]
+            padding: [dp(6), dp(4)]
+
+            canvas.before:
+                Color:
+                    rgba: app.border_color
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(18)]
+                Color:
+                    rgba: app.card_color
+                RoundedRectangle:
+                    pos: self.x + dp(1), self.y + dp(1)
+                    size: self.width - dp(2), self.height - dp(2)
+                    radius: [dp(17)]
 
             Label:
                 text: root.words_title
                 font_name: 'BrailleFont'
-                font_size: dp(18)
+                font_size: dp(15)
+                bold: True
+                color: app.text_soft_color
                 size_hint_y: None
-                height: dp(24)
+                height: dp(22)
                 halign: 'left'
-                text_size: self.size
                 valign: 'middle'
+                text_size: self.width, None
 
             ScrollView:
-                bar_width: dp(6)
+                bar_width: dp(3)
                 do_scroll_x: False
                 do_scroll_y: True
                 size_hint_y: 1
@@ -897,77 +1315,88 @@ Builder.load_string('''
                     text: root.words_line
                     font_name: 'BrailleFont'
                     markup: True
-                    font_size: dp(18)
+                    font_size: dp(17)
                     size_hint_y: None
                     height: max(self.texture_size[1] + dp(12), dp(80))
                     text_size: self.width, None
                     halign: 'left'
                     valign: 'top'
-                    color: (0.9, 0.9, 0.9, 1)
-
-        BoxLayout:
-            size_hint_y: None
-            height: dp(56)
-            spacing: dp(8)
-
-            BaseButton:
-                text: root.back_btn
-                font_name: 'BrailleFont'
-                height: dp(50)
-                on_press: app.switch_screen('practice_levels')
-
+                    color: app.text_color
 
 <SettingsSection@BoxLayout>:
     orientation: 'vertical'
     size_hint_y: None
     height: self.minimum_height
-    padding: dp(15)
-    spacing: dp(10)
+    padding: dp(16)
+    spacing: dp(6)
+
     canvas.before:
         Color:
-            rgba: 0.2, 0.2, 0.2, 0.6
+            rgba: app.border_color
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(15)]
+            radius: [dp(20)]
+        Color:
+            rgba: app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(19)]
 
 <SettingsHeader@Label>:
     size_hint_y: None
     height: self.texture_size[1] + dp(10)
-    font_size: dp(27)
-    halign: 'center'
+    font_size: dp(17)
+    halign: 'left'
     valign: 'middle'
     bold: True
-    color: 0.95, 0.95, 0.95, 1
+    color: app.text_soft_color
     text_size: self.width, None
-
 
 <SettingsScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
-        spacing: dp(10)
+        spacing: dp(6)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
-        Label:
-            text: root.settings_title
-            font_name: 'BrailleFont'
-            font_size: dp(28)
-            bold: True
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(50)
-            halign: 'center'
-            valign: 'middle'
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('menu')
+
+            Label:
+                text: root.settings_title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
         ScrollView:
-            bar_width: dp(6)
-            bar_inactive_color: [0.6, 0.6, 0.6, 1]
+            size_hint_y: 1
+            do_scroll_x: False
 
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
-                padding: dp(10)
-                spacing: dp(20)
+                spacing: dp(14)
+                padding: [dp(2), dp(4)]
 
                 SettingsSection:
                     SettingsHeader:
@@ -976,7 +1405,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.language_label
@@ -986,6 +1415,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Spinner:
                             id: lang_spinner
                             text: root.current_lang
@@ -996,7 +1426,28 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
+                        spacing: dp(10)
+                        Label:
+                            text: root.theme_label
+                            font_name: 'BrailleFont'
+                            size_hint_x: None
+                            width: dp(100)
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                            color: app.text_color
+                        Spinner:
+                            id: theme_spinner
+                            text: root.current_theme_str
+                            font_name: 'BrailleFont'
+                            values: root.theme_values
+                            size_hint_x: 1
+                            on_text: root.update_theme(self.text)
+
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.use_stats
@@ -1004,6 +1455,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: interval_switch
                             active: app.use_stats
@@ -1011,15 +1463,19 @@ Builder.load_string('''
                             width: dp(60)
                             on_active: root.update_update_use_stats(self.active)
 
-                    BaseButton:
+                    Button:
                         text: root.reset_stats_btn
                         font_name: 'BrailleFont'
-                        height: dp(50)
+                        size_hint_y: None
+                        height: dp(58)
+                        color: 0.86, 0.15, 0.15, 1
                         on_press: root.reset_stats()
-                    BaseButton:
+                    Button:
                         text: root.reset_lessons_btn
                         font_name: 'BrailleFont'
-                        height: dp(50)
+                        size_hint_y: None
+                        height: dp(58)
+                        color: 0.86, 0.15, 0.15, 1
                         on_press: root.reset_lessons_progress()
 
                 SettingsSection:
@@ -1029,16 +1485,17 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.difficulty_label
                             font_name: 'BrailleFont'
                             size_hint_x: None
-                            width: dp(100)
+                            width: dp(120)
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Spinner:
                             id: difficulty_spinner
                             text: root.current_difficulty_str
@@ -1050,7 +1507,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
@@ -1058,6 +1515,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: easy_letters_sw
                             active: app.easy_mode_letters
@@ -1067,7 +1525,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
@@ -1075,6 +1533,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: easy_digits_sw
                             active: app.easy_mode_digits
@@ -1089,7 +1548,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.mirror_mode_label
@@ -1097,6 +1556,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: mirror_switch
                             active: app.mirror_writing_mode
@@ -1106,7 +1566,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
@@ -1114,6 +1574,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: medium_letters_sw
                             active: app.medium_mode_letters
@@ -1123,7 +1584,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
@@ -1131,6 +1592,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: medium_digits_sw
                             active: app.medium_mode_digits
@@ -1145,7 +1607,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.time_label
@@ -1155,11 +1617,11 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         TextInput:
                             id: time_input
                             font_name: 'BrailleFont'
                             text: str(app.quick_review_time)
-                            font_name: 'BrailleFont'
                             hint_text: root.time_hint
                             input_filter: 'int'
                             multiline: False
@@ -1167,9 +1629,10 @@ Builder.load_string('''
                             width: dp(150)
                             padding: [dp(10), (self.height - self.line_height) / 2]
                             on_text: root.update_settings('time', self.text)
+
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_easy_label
@@ -1177,15 +1640,17 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: quick_easy_sw
                             active: app.quick_mode_easy
                             size_hint_x: None
                             width: dp(60)
                             on_active: root.toggle_quick_easy(self.active)
+
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_easy_words_label
@@ -1193,15 +1658,17 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: quick_easy_words_sw
                             active: app.quick_mode_easy_words
                             size_hint_x: None
                             width: dp(60)
                             on_active: root.toggle_quick_easy_words(self.active)
+
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_medium_label
@@ -1209,6 +1676,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: quick_medium_sw
                             active: app.quick_mode_medium
@@ -1218,7 +1686,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.quick_mode_hard_label
@@ -1226,6 +1694,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: quick_hard_sw
                             active: app.quick_mode_hard
@@ -1240,7 +1709,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_letters
@@ -1248,6 +1717,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: memo_letters_sw
                             active: app.memo_mode_letters
@@ -1257,7 +1727,7 @@ Builder.load_string('''
 
                     BoxLayout:
                         size_hint_y: None
-                        height: dp(50)
+                        height: dp(52)
                         spacing: dp(10)
                         Label:
                             text: root.include_digits
@@ -1265,6 +1735,7 @@ Builder.load_string('''
                             halign: 'left'
                             text_size: self.width, None
                             valign: 'middle'
+                            color: app.text_color
                         Switch:
                             id: memo_digits_sw
                             active: app.memo_mode_digits
@@ -1274,378 +1745,478 @@ Builder.load_string('''
 
                 Widget:
                     size_hint_y: None
-                    height: dp(10)
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: app.switch_screen('menu')
-
+                    height: dp(6)
 
 <ReferenceRow>:
     orientation: 'horizontal'
     size_hint_y: None
-    height: dp(54) if root.is_header else dp(80)
+    height: dp(46) if root.is_header else dp(72)
     spacing: dp(0)
 
     canvas.before:
         Color:
-            rgba: (0.2, 0.2, 0.2, 0.55) if root.is_header else (0, 0, 0, 0)
+            rgba: (app.header_tint_color) if root.is_header else (app.border_color)
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(10)] if root.is_header else [0]
+            radius: [dp(14)]
+        Color:
+            rgba: (app.header_tint_color) if root.is_header else (app.card_color)
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(13)]
 
     Label:
         text: root.symbol
         font_name: 'BrailleFont'
-        font_size: dp(26) if root.is_header else dp(56)
+        font_size: dp(20) if root.is_header else dp(40)
         bold: root.is_header
         size_hint_x: 1 if root.is_header else 0.25
         halign: 'center'
         valign: 'middle'
         text_size: self.size
-        color: (0.95, 0.95, 0.95, 1)
+        color: (app.accent_color) if root.is_header else (app.text_color)
 
     Label:
         text: root.stats if not root.is_header else ''
         font_name: 'BrailleFont'
-        font_size: dp(18)
+        font_size: dp(16)
         size_hint_x: 0 if root.is_header else 0.5
         opacity: 0 if root.is_header else 1
         halign: 'center'
         valign: 'middle'
         text_size: self.size
-        color: (0.75, 0.75, 0.75, 1)
+        color: app.text_soft_color
 
     Label:
         text: root.braille
         font_name: 'BrailleFont'
-        font_size: dp(56)
+        font_size: dp(40)
         size_hint_x: 0 if root.is_header else 0.25
         opacity: 0 if root.is_header else 1
         halign: 'center'
         valign: 'middle'
         text_size: self.size
-        color: (1, 1, 1, 1)
+        color: (app.accent_color) if root.is_header else (app.accent_color)
 
 <ReferenceScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(20)
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
-        Label:
-            text: root.reference_title
-            font_name: 'BrailleFont'
-            font_size: dp(28)
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(45)
-            halign: 'center'
-            valign: 'middle'
-            text_size: self.width, None
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('menu')
+
+            Label:
+                text: root.reference_title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
         RecycleView:
             id: rv
-            bar_width: dp(10)
+            bar_width: dp(3)
             scroll_type: ['bars', 'content']
             do_scroll_x: False
             viewclass: 'ReferenceRow'
 
             RecycleBoxLayout:
-                default_size: None, dp(80)
+                default_size: None, dp(72)
                 default_size_hint: 1, None
                 size_hint_y: None
                 height: self.minimum_height
                 orientation: 'vertical'
-                spacing: dp(10)
-                padding: dp(5), dp(10), dp(5), dp(10)
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: app.switch_screen('menu')
+                spacing: dp(8)
+                padding: dp(2), dp(6), dp(2), dp(6)
 
 <TranslatorScreen>:
     BoxLayout:
         orientation: 'vertical'
-        spacing: dp(10)
-        padding: dp(20)
-
-        Label:
-            text: root.translator_title
-            font_name: 'BrailleFont'
-            font_size: dp(26)
-            size_hint_y: None
-            height: dp(45)
-            halign: 'center'
-            valign: 'middle'
-
-        TextInput:
-            id: input_text
-            font_name: 'BrailleFont'
-            hint_text: root.input_hint
-            size_hint_y: None
-            height: dp(120)
-            multiline: True
-            padding: dp(12)
-            on_text: root.live_translate()
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
         BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(60)
-            spacing: dp(5)
-            padding: 0
+            height: dp(54)
+            spacing: dp(10)
 
-            BaseButton:
-                id: copy_btn
-                text: root.copy_btn
+            Button:
+                text: root.back_btn
                 font_name: 'BrailleFont'
-                size_hint: (1, 1)
-                height: dp(60)
-                on_press: root.copy_braille_result()
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press:
+                    root.close_braille_input()
+                    app.switch_screen('menu')
 
-            BaseButton:
-                text: root.input_braille_btn
+            Label:
+                text: root.translator_title
                 font_name: 'BrailleFont'
-                size_hint: (1, 1)
-                height: dp(60)
-                on_press: root.open_braille_input()
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
-        FloatLayout:
-            size_hint_y: 0.45
+        BoxLayout:
+            id: translator_body
+            orientation: 'vertical'
+            size_hint_y: 1
+            spacing: dp(8)
 
-            ScrollView:
-                id: braille_output_container
-                size_hint: (0.95, 0.9)
-                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-                bar_width: dp(10)
-
-                BoxLayout:
-                    id: braille_output_box
-                    size_hint_y: None
-                    height: self.minimum_height
-                    orientation: 'vertical'
-                    padding: dp(10)
+            TextInput:
+                id: input_text
+                font_name: 'BrailleFont'
+                hint_text: root.input_hint
+                size_hint_y: 0.17
+                multiline: True
+                on_text: root.live_translate()
 
             BoxLayout:
-                id: braille_input_panel
-                orientation: 'vertical'
-                size_hint: (0.8, 0.8)
-                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-                padding: dp(10)
-                opacity: 0
-                disabled: True
-                canvas.before:
-                    Color:
-                        rgba: 0.2, 0.2, 0.2, 0.9 if root.opacity > 0 else 0
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [dp(10)]
+                size_hint_y: 0.11
+                spacing: dp(10)
+                padding: 0
+
+                BaseButton:
+                    id: copy_btn
+                    text: root.copy_btn
+                    font_name: 'BrailleFont'
+                    size_hint: (1, 1)
+                    on_press: root.copy_braille_result()
+
+                Button:
+                    text: root.input_braille_btn
+                    font_name: 'BrailleFont'
+                    size_hint: (1, 1)
+                    on_press: root.open_braille_input()
+
+            FloatLayout:
+                size_hint_y: 0.72
 
                 BoxLayout:
-                    size_hint_y: 0.25
-                    spacing: dp(5)
-                    padding: dp(5)
+                    size_hint: (0.95, 0.92)
+                    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                    padding: dp(8)
 
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(0)
-                        id: dot1_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
+                    canvas.before:
+                        Color:
+                            rgba: app.border_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(18)]
+                        Color:
+                            rgba: app.card_color
+                        RoundedRectangle:
+                            pos: self.x + dp(1), self.y + dp(1)
+                            size: self.width - dp(2), self.height - dp(2)
+                            radius: [dp(17)]
 
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(3)
-                        id: dot4_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
+                    ScrollView:
+                        id: braille_output_container
+                        bar_width: dp(3)
 
-                BoxLayout:
-                    size_hint_y: 0.25
-                    spacing: dp(5)
-                    padding: dp(5)
-
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(1)
-                        id: dot2_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
-
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(4)
-                        id: dot5_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
+                        BoxLayout:
+                            id: braille_output_box
+                            size_hint_y: None
+                            height: self.minimum_height
+                            orientation: 'vertical'
+                            padding: dp(10)
 
                 BoxLayout:
-                    size_hint_y: 0.25
-                    spacing: dp(5)
-                    padding: dp(5)
+                    id: braille_input_panel
+                    orientation: 'vertical'
+                    size_hint: None, None
+                    width: dp(340)
+                    height: self.minimum_height
+                    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                    padding: dp(18)
+                    spacing: dp(12)
+                    opacity: 0
+                    disabled: True
 
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(2)
-                        id: dot3_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
+                    canvas.before:
+                        Color:
+                            rgba: app.border_color[0], app.border_color[1], app.border_color[2], 0.97 if self.opacity > 0 else 0
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(22)]
+                        Color:
+                            rgba: app.card_color[0], app.card_color[1], app.card_color[2], 0.97 if self.opacity > 0 else 0
+                        RoundedRectangle:
+                            pos: self.x + dp(1), self.y + dp(1)
+                            size: self.width - dp(2), self.height - dp(2)
+                            radius: [dp(21)]
 
-                    Button:
-                        text: '*'
-                        on_press: root.on_braille_dot_press(5)
-                        id: dot6_trans
-                        size_hint: 1, 1
-                        width: dp(80)
-                        height: dp(80)
-                        font_size: dp(30)
+                    GridLayout:
+                        cols: 2
+                        rows: 3
+                        spacing: dp(18)
+                        size_hint: None, None
+                        width: self.minimum_width
+                        height: self.minimum_height
+                        pos_hint: {'center_x': 0.5}
 
-                BoxLayout:
-                    size_hint_y: 0.25
-                    spacing: dp(10)
-                    padding: dp(5)
+                        DotButton:
+                            on_press: root.on_braille_dot_press(0)
+                            id: dot1_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
 
-                    BaseButton:
-                        text: root.confirm_btn
-                        font_name: 'BrailleFont'
-                        size_hint: 0.5, 1
-                        height: dp(60)
-                        on_press: root.confirm_braille_input()
+                        DotButton:
+                            on_press: root.on_braille_dot_press(3)
+                            id: dot4_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
 
-                    BaseButton:
-                        text: root.delete_btn
-                        font_name: 'BrailleFont'
-                        size_hint: 0.5, 1
-                        height: dp(60)
-                        on_press: root.delete_last_char()
+                        DotButton:
+                            on_press: root.on_braille_dot_press(1)
+                            id: dot2_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
 
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press:
-                root.close_braille_input()
-                app.switch_screen('menu')
+                        DotButton:
+                            on_press: root.on_braille_dot_press(4)
+                            id: dot5_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
+
+                        DotButton:
+                            on_press: root.on_braille_dot_press(2)
+                            id: dot3_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
+
+                        DotButton:
+                            on_press: root.on_braille_dot_press(5)
+                            id: dot6_trans
+                            size_hint: None, None
+                            size: dp(64), dp(64)
+
+                    BoxLayout:
+                        size_hint: None, None
+                        size: dp(300), dp(56)
+                        spacing: dp(10)
+                        pos_hint: {'center_x': 0.5}
+
+                        BaseButton:
+                            text: root.confirm_btn
+                            font_name: 'BrailleFont'
+                            size_hint: 0.5, 1
+                            on_press: root.confirm_braille_input()
+
+                        Button:
+                            text: root.delete_btn
+                            font_name: 'BrailleFont'
+                            size_hint: 0.5, 1
+                            on_press: root.delete_last_char()
 
 <PracticeLevelsScreen>:
     BoxLayout:
         orientation: 'vertical'
-        padding: [dp(10), dp(20)]
         spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
 
-        Label:
-            text: root.title
-            font_name: 'BrailleFont'
-            font_size: dp(26)
+        BoxLayout:
+            orientation: 'horizontal'
             size_hint_y: None
-            height: dp(60)
-            halign: 'center'
-            valign: 'middle'
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('menu')
+
+            Label:
+                text: root.title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
 
         ScrollView:
             size_hint_y: 1
-            bar_width: dp(6)
-            bar_inactive_color: [0.6, 0.6, 0.6, 1]
+            do_scroll_x: False
 
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
-                padding: [dp(10), dp(10)]
-                spacing: dp(20)
+                spacing: dp(14)
+                padding: [dp(2), dp(4)]
 
                 BoxLayout:
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(15)
-                    spacing: dp(15)
+                    padding: dp(16)
+                    spacing: dp(10)
 
                     canvas.before:
                         Color:
-                            rgba: 0.2, 0.2, 0.2, 0.6
+                            rgba: app.border_color
                         RoundedRectangle:
                             pos: self.pos
                             size: self.size
-                            radius: [dp(15)]
+                            radius: [dp(20)]
+                        Color:
+                            rgba: app.card_color
+                        RoundedRectangle:
+                            pos: self.x + dp(1), self.y + dp(1)
+                            size: self.width - dp(2), self.height - dp(2)
+                            radius: [dp(19)]
 
-                    BaseButton:
-                        text: root.easy_level_btn
-                        font_name: 'BrailleFont'
-                        on_press: root.start_easy_level()
-                    BaseButton:
-                        text: root.easy_words_level_btn
-                        font_name: 'BrailleFont'
-                        on_press: root.start_easy_words_level()
-                    BaseButton:
-                        text: root.medium_level_btn
-                        font_name: 'BrailleFont'
-                        on_press: root.start_medium_level()
-                    BaseButton:
-                        text: root.hard_level_btn
-                        font_name: 'BrailleFont'
-                        on_press: root.start_hard_level()
-                    BaseButton:
+                    Label:
+                        size_hint_y: None
+                        height: self.texture_size[1] + dp(8)
+                        font_size: dp(17)
+                        halign: 'left'
+                        valign: 'middle'
+                        bold: True
+                        color: app.text_soft_color
+                        text_size: self.width, None
                         text: root.quick_review_btn
                         font_name: 'BrailleFont'
+
+                    Button:
+                        text: root.easy_level_btn
+                        font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
+                        on_press: root.start_easy_level()
+                    Button:
+                        text: root.easy_words_level_btn
+                        font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
+                        on_press: root.start_easy_words_level()
+                    Button:
+                        text: root.medium_level_btn
+                        font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
+                        on_press: root.start_medium_level()
+                    Button:
+                        text: root.hard_level_btn
+                        font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
+                        on_press: root.start_hard_level()
+                    Button:
+                        text: root.quick_review_btn
+                        font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
                         on_press: root.start_quick_review()
 
                 BoxLayout:
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(15)
-                    spacing: dp(15)
+                    padding: dp(16)
+                    spacing: dp(10)
 
                     canvas.before:
                         Color:
-                            rgba: 0.2, 0.2, 0.2, 0.6
+                            rgba: app.border_color
                         RoundedRectangle:
                             pos: self.pos
                             size: self.size
-                            radius: [dp(15)]
+                            radius: [dp(20)]
+                        Color:
+                            rgba: app.card_color
+                        RoundedRectangle:
+                            pos: self.x + dp(1), self.y + dp(1)
+                            size: self.width - dp(2), self.height - dp(2)
+                            radius: [dp(19)]
+
                     Label:
                         size_hint_y: None
-                        height: self.texture_size[1] + dp(10)
-                        font_size: dp(27)
-                        halign: 'center'
+                        height: self.texture_size[1] + dp(8)
+                        font_size: dp(17)
+                        halign: 'left'
                         valign: 'middle'
                         bold: True
-                        color: 0.95, 0.95, 0.95, 1
+                        color: app.text_soft_color
                         text_size: self.width, None
                         text: root.games
                         font_name: 'BrailleFont'
 
-                    BaseButton:
+                    Button:
                         text: root.memory_game_title
                         font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
                         on_press: app.switch_screen('memory_game')
-                    BaseButton:
+                    Button:
                         text: root.word_search_title
                         font_name: 'BrailleFont'
+                        font_size: dp(20)
+                        size_hint_y: None
+                        height: dp(62)
                         on_press: app.switch_screen('word_search')
-
-        BaseButton:
-            text: root.back_btn
-            font_name: 'BrailleFont'
-            height: dp(50)
-            on_press: app.switch_screen('menu')
 ''')
+
+def _create_gradient_texture(dark=False):
+    tex = Texture.create(size=(4, 32), colorfmt='rgba')
+    buf = bytearray()
+    for y in range(32):
+        t = y / 31.0
+        if dark:
+            r = int(130 + (168 - 130) * t)
+            g = int(128 + (122 - 128) * t)
+            b = int(252 + (255 - 252) * t)
+        else:
+            r = int(99 + (139 - 99) * t)
+            g = int(102 + (92 - 102) * t)
+            b = int(241 + (246 - 241) * t)
+        buf += bytes((r, g, b, 255)) * 4
+    tex.blit_buffer(bytes(buf), colorfmt='rgba', bufferfmt='ubyte')
+    return tex
+
 
 number_sign_dots = [0, 0, 1, 1, 1, 1]  # ⠼
 digits_data = {
@@ -1868,6 +2439,18 @@ class BaseScreen(Screen):
         if dots[5]: code |= 0x20
         return chr(code)
 
+    def text_to_braille(self, text):
+        out = []
+        lang_map = self.app.braille_data.get(self.app.current_language, {})
+        for char in text.upper():
+            if char == ' ':
+                out.append(' ')
+                continue
+            key = char.lower() if char.lower() in lang_map else char
+            dots = lang_map.get(key)
+            out.append(self.get_braille_char(dots) if dots else char)
+        return ''.join(out)
+
     def update_streak_text(self, score_key, local_streak_attr="current_streak",
                            streak_prop="streak_text", ):
         lang = self.app.current_language
@@ -2008,8 +2591,6 @@ class BaseScreen(Screen):
     def disable_children(self, widget):
         for ch in widget.children:
             ch.disabled = True
-            if hasattr(ch, "disabled_color"):
-                ch.disabled_color = (1, 1, 1, 1)
 
     def show_win_popup(self, text, on_again):
         return self.show_popup(
@@ -2092,6 +2673,7 @@ class BaseScreen(Screen):
 
 class MenuScreen(BaseScreen):
     menu_title = StringProperty()
+    menu_braille = StringProperty()
     training_title = StringProperty()
     practice = StringProperty()
     reference_title = StringProperty()
@@ -2100,27 +2682,14 @@ class MenuScreen(BaseScreen):
 
     def update_lang(self):
         super().update_lang()
-        original_title = self.get_translation('menu_title')
-
-        if random.random() < 0.01:
-            braille_title = ''
-            for char in original_title.upper():
-                lang_map = self.app.braille_data.get(self.app.current_language, {})
-                if char in lang_map:
-                    dots = lang_map[char]
-                    braille_title += self.get_braille_char(dots)
-                else:
-                    braille_title += ' '
-            self.menu_title = braille_title
-        else:
-            self.menu_title = original_title
+        self.menu_title = self.get_translation('menu_title')
+        self.menu_braille = self.text_to_braille(self.menu_title)
 
         self.training_title = self.get_translation('training_title')
         self.practice = self.get_translation('practice')
         self.reference_title = self.get_translation('reference_title')
         self.translator_title = self.get_translation('translator_title')
         self.settings_title = self.get_translation('settings_title')
-
 
 class LessonRow(BoxLayout):
     lesson_index = NumericProperty(0)
@@ -2203,20 +2772,20 @@ class LessonsScreen(BaseScreen):
 
             if stars > 0:
                 if mode == 'study':
-                    status_text = f"[color=33aa33]{self.get_translation('completed')}[/color]"
+                    status_text = f"[color=059669]{self.get_translation('completed')}[/color]"
                     btn_text = self.get_translation('retry')
                 else:
-                    filled_star = "[color=FFD700]★[/color]"
-                    empty_star = "[color=555555]★[/color]"
+                    filled_star = "[color=F59E0B]★[/color]"
+                    empty_star = "[color=E2E8F0]★[/color]"
                     stars_visual = (filled_star * stars) + (empty_star * (5 - stars))
                     status_text = f"[font=BrailleFont]{stars_visual}[/font]"
                     btn_text = self.get_translation('retry')
 
             elif is_unlocked:
-                status_text = f"[color=3333aa]{self.get_translation('available')}[/color]"
+                status_text = f"[color=4F46E5]{self.get_translation('available')}[/color]"
                 btn_text = self.get_translation('start')
             else:
-                status_text = f"[color=aa3333]{self.get_translation('locked')}[/color]"
+                status_text = f"[color=94A3B8]{self.get_translation('locked')}[/color]"
                 btn_text = self.get_translation('start')
 
             data.append({
@@ -2301,9 +2870,8 @@ class LessonStudyScreen(BaseScreen):
 
     def _reset_buttons_visual(self):
         for b in self._dot_btns:
-            b.background_color = (1, 1, 1, 1)
+            b.background_color = self.app.card_color
             b.disabled = False
-            b.disabled_color = (1, 1, 1, 1)
 
     def _stop_all_pulses(self):
         for btn in self._dot_btns:
@@ -2319,11 +2887,11 @@ class LessonStudyScreen(BaseScreen):
                 continue
             btn = self._dot_btns[idx]
             Animation.cancel_all(btn, "background_color")
-            btn.background_color = (0.7, 0.9, 1.0, 1)
+            btn.background_color = (0.78, 0.824, 0.996, 1)
 
             anim = (
-                    Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
-                    + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+                    Animation(background_color=(0.647, 0.706, 0.988, 1), duration=0.55)
+                    + Animation(background_color=(0.78, 0.824, 0.996, 1), duration=0.55)
             )
             anim.repeat = True
             anim.start(btn)
@@ -2491,7 +3059,7 @@ class LessonStudyScreen(BaseScreen):
             Animation.cancel_all(btn, "background_color")
             Animation.cancel_all(btn, "x")
 
-            btn.background_color = (1, 0.4, 0.4, 1)
+            btn.background_color = (1, 0.47, 0.47, 1)
 
             original_x = btn.x
             anim = (
@@ -2504,7 +3072,7 @@ class LessonStudyScreen(BaseScreen):
 
             def on_anim_complete(*args):
                 btn._is_animating = False
-                btn.background_color = (1, 1, 1, 1)
+                btn.background_color = self.app.card_color
 
                 if self._phase == 'learn':
                     self._restore_dot_color(dot_index)
@@ -2522,7 +3090,7 @@ class LessonStudyScreen(BaseScreen):
             Animation.cancel_all(btn, "background_color")
             del self._pulse_anims[dot_index]
 
-        btn.background_color = (0.2, 0.85, 0.2, 1)
+        btn.background_color = (0.02, 0.59, 0.41, 1)
         self.animate_correct(btn)
 
         if self._is_completed():
@@ -2536,7 +3104,7 @@ class LessonStudyScreen(BaseScreen):
         for i in range(6):
             btn = self._dot_btns[i]
             Animation.cancel_all(btn, "background_color")
-            btn.background_color = (1, 1, 1, 1)
+            btn.background_color = self.app.card_color
 
     def _restore_dot_color(self, dot_index: int):
         if self._locked or not self.is_learning_active:
@@ -2555,16 +3123,16 @@ class LessonStudyScreen(BaseScreen):
 
         if self._target_dots[dot_index] and not self._pressed[dot_index]:
             if self._phase == 'learn':
-                btn.background_color = (0.7, 0.9, 1.0, 1)
+                btn.background_color = (0.78, 0.824, 0.996, 1)
                 anim = (
-                        Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55)
-                        + Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+                        Animation(background_color=(0.647, 0.706, 0.988, 1), duration=0.55)
+                        + Animation(background_color=(0.78, 0.824, 0.996, 1), duration=0.55)
                 )
                 anim.repeat = True
                 anim.start(btn)
                 self._pulse_anims[dot_index] = anim
         else:
-            btn.background_color = (1, 1, 1, 1)
+            btn.background_color = self.app.card_color
 
     def _is_completed(self):
         for i in range(6):
@@ -2709,7 +3277,6 @@ class LessonTestScreen(BaseScreen):
             btn = Button(size_hint=(1, None), height=dp(72), font_size=dp(24))
             btn.background_disabled_normal = btn.background_normal
             btn.background_disabled_down = btn.background_down
-            btn.disabled_color = (1, 1, 1, 1)
             btn.answer_char = a
 
             if self.invert_mode:
@@ -2732,15 +3299,18 @@ class LessonTestScreen(BaseScreen):
         self.disable_children(self.ids.answers_grid)
 
         if instance.answer_char == correct_char:
-            instance.background_color = (0, 1, 0, 1)
+            instance.background_color = (0.02, 0.59, 0.41, 1)
+            instance.color = (1, 1, 1, 1)
             self.correct += 1
             self.app.update_char_stat(correct_char, True)
             self.animate_correct(instance)
         else:
-            instance.background_color = (1, 0, 0, 1)
+            instance.background_color = (0.86, 0.15, 0.15, 1)
+            instance.color = (1, 1, 1, 1)
             self.animate_wrong(instance)
             if self.correct_button:
-                self.correct_button.background_color = (0, 1, 0, 1)
+                self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
+                self.correct_button.color = (1, 1, 1, 1)
             self.app.update_char_stat(correct_char, False)
 
         self.schedule_once(self.next_question, 0.8)
@@ -2841,7 +3411,7 @@ class PracticeScreen(BaseScreen):
         self._set_answer_buttons_enabled(False)
 
         if self.correct_button:
-            self.correct_button.background_color = (0, 1, 0, 1)
+            self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
 
         if self.current_symbol:
             self.app.update_char_stat(self.current_symbol, False)
@@ -2925,7 +3495,7 @@ class PracticeScreen(BaseScreen):
                 btn.disabled = False
                 btn.height = final_row_height
                 btn.answer_char = ans
-                btn.background_color = (1, 1, 1, 1)
+                btn.background_color = self.app.card_color
 
                 if self.invert_mode:
                     if ans in digits_data:
@@ -2957,7 +3527,6 @@ class PracticeScreen(BaseScreen):
 
         for _ in range(max_n):
             btn = Button(size_hint=(1, None), on_press=self.check_answer)
-            btn.disabled_color = (1, 1, 1, 1)
             btn.background_disabled_normal = btn.background_normal
             btn.background_disabled_down = btn.background_down
             btn.answer_char = None
@@ -3031,7 +3600,6 @@ class PracticeScreen(BaseScreen):
             if btn.opacity == 0:
                 continue
             btn.disabled = not enabled
-            btn.disabled_color = (1, 1, 1, 1)
 
     def check_answer(self, instance):
         self.stop_timer()
@@ -3045,7 +3613,8 @@ class PracticeScreen(BaseScreen):
         is_correct = (chosen_char == char)
 
         if is_correct:
-            instance.background_color = (0, 1, 0, 1)
+            instance.background_color = (0.02, 0.59, 0.41, 1)
+            instance.color = (1, 1, 1, 1)
             self.animate_correct(instance)
 
             if self.quick_review_mode:
@@ -3059,10 +3628,12 @@ class PracticeScreen(BaseScreen):
                     self.app.high_scores[lang]['practice'] = self.current_streak
                     self.app.save_high_scores()
         else:
-            instance.background_color = (1, 0, 0, 1)
+            instance.background_color = (0.86, 0.15, 0.15, 1)
+            instance.color = (1, 1, 1, 1)
             self.animate_wrong(instance)
             if self.correct_button:
-                self.correct_button.background_color = (0, 1, 0, 1)
+                self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
+                self.correct_button.color = (1, 1, 1, 1)
 
             if self.quick_review_mode:
                 self.app.quick_streak = max(0, self.app.quick_streak - 1)
@@ -3129,7 +3700,6 @@ class EasyWordsPracticeScreen(BaseScreen):
 
         for _ in range(self.OPTIONS_COUNT):
             btn = Button(size_hint=(1, None), on_press=self.check_answer)
-            btn.disabled_color = (1, 1, 1, 1)
             btn.background_disabled_normal = btn.background_normal
             btn.background_disabled_down = btn.background_down
             btn.answer_word = None
@@ -3268,7 +3838,7 @@ class EasyWordsPracticeScreen(BaseScreen):
                 btn.disabled = False
                 btn.height = row_h
                 btn.answer_word = ans
-                btn.background_color = (1, 1, 1, 1)
+                btn.background_color = self.app.card_color
 
                 if self.invert_mode:
                     btn.text = self._word_to_braille(ans)
@@ -3293,7 +3863,6 @@ class EasyWordsPracticeScreen(BaseScreen):
             if btn.opacity == 0:
                 continue
             btn.disabled = not enabled
-            btn.disabled_color = (1, 1, 1, 1)
 
     def _apply_word_stats(self, is_correct: bool):
         for ch in self.current_word:
@@ -3305,7 +3874,7 @@ class EasyWordsPracticeScreen(BaseScreen):
         self._set_answer_buttons_enabled(False)
 
         if self.correct_button:
-            self.correct_button.background_color = (0, 1, 0, 1)
+            self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
 
         if self.current_word:
             self._apply_word_stats(False)
@@ -3328,7 +3897,8 @@ class EasyWordsPracticeScreen(BaseScreen):
         is_correct = (chosen_word == self.current_word)
 
         if is_correct:
-            instance.background_color = (0, 1, 0, 1)
+            instance.background_color = (0.02, 0.59, 0.41, 1)
+            instance.color = (1, 1, 1, 1)
             self.animate_correct(instance)
 
             self._apply_word_stats(True)
@@ -3344,11 +3914,13 @@ class EasyWordsPracticeScreen(BaseScreen):
                     self.app.high_scores[lang]['easy_words_practice'] = self.current_streak
                     self.app.save_high_scores()
         else:
-            instance.background_color = (1, 0, 0, 1)
+            instance.background_color = (0.86, 0.15, 0.15, 1)
+            instance.color = (1, 1, 1, 1)
             self.animate_wrong(instance)
 
             if self.correct_button:
-                self.correct_button.background_color = (0, 1, 0, 1)
+                self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
+                self.correct_button.color = (1, 1, 1, 1)
 
             self._apply_word_stats(False)
 
@@ -3440,9 +4012,7 @@ class MediumPracticeScreen(BaseScreen):
 
         for btn in self.dot_buttons:
             btn.disabled = True
-            btn.disabled_color = (1, 1, 1, 1)
         self.ids.confirm_btn.disabled = True
-        self.ids.confirm_btn.disabled_color = (1, 1, 1, 1)
         self.ids.hint_btn.disabled = True
 
         for visual_index, btn in enumerate(self.dot_buttons):
@@ -3452,15 +4022,15 @@ class MediumPracticeScreen(BaseScreen):
             user = user_input[logical_index]
 
             if correct and user:
-                btn.background_color = (0, 1, 0, 1)
+                btn.background_color = (0.02, 0.59, 0.41, 1)
                 self.animate_correct(btn)
             elif correct and not user:
-                btn.background_color = (1, 0.7, 0, 1)
+                btn.background_color = (0.961, 0.62, 0.043, 1)
                 self.animate_correct(btn)
             elif not correct and user:
-                btn.background_color = (1, 0, 0, 1)
+                btn.background_color = (0.86, 0.15, 0.15, 1)
             else:
-                btn.background_color = (1, 1, 1, 1)
+                btn.background_color = self.app.card_color
 
     def new_question(self):
         self._stop_all_pulses()
@@ -3468,7 +4038,7 @@ class MediumPracticeScreen(BaseScreen):
         self.user_input = [0] * 6
         self.hint_used = False
         for btn in self.dot_buttons:
-            btn.background_color = (1, 1, 1, 1)
+            btn.background_color = self.app.card_color
             btn.state = 'normal'
 
         current_time = time.time()
@@ -3508,16 +4078,16 @@ class MediumPracticeScreen(BaseScreen):
         logical_index = self.get_logical_index(visual_index)
         self.user_input[logical_index] = 1 - self.user_input[logical_index]
 
-        instance.background_color = (0.7, 0.7, 0.7, 1) if self.user_input[logical_index] else (1, 1, 1, 1)
+        instance.background_color = self.app.accent_color if self.user_input[logical_index] else self.app.card_color
 
     def _stop_all_pulses(self):
         for idx, btn in enumerate(self.dot_buttons):
             Animation.cancel_all(btn, "background_color")
             logical_idx = self.get_logical_index(idx)
             if self.user_input[logical_idx]:
-                btn.background_color = (0.7, 0.7, 0.7, 1)
+                btn.background_color = self.app.accent_color
             else:
-                btn.background_color = (1, 1, 1, 1)
+                btn.background_color = self.app.card_color
         self._pulse_anims.clear()
 
     def show_hint(self):
@@ -3534,18 +4104,18 @@ class MediumPracticeScreen(BaseScreen):
             is_pressed = self.user_input[logical_index] == 1
 
             if is_target and not is_pressed:
-                btn.background_color = (0.7, 0.9, 1.0, 1)
+                btn.background_color = (0.78, 0.824, 0.996, 1)
 
                 anim = (
-                        Animation(background_color=(0.4, 0.7, 1.0, 1), duration=0.55) +
-                        Animation(background_color=(0.7, 0.9, 1.0, 1), duration=0.55)
+                        Animation(background_color=(0.647, 0.706, 0.988, 1), duration=0.55) +
+                        Animation(background_color=(0.78, 0.824, 0.996, 1), duration=0.55)
                 )
                 anim.repeat = True
                 anim.start(btn)
                 self._pulse_anims[visual_index] = anim
 
             elif not is_target and is_pressed:
-                btn.background_color = (1, 0.6, 0.6, 1)
+                btn.background_color = (0.99, 0.69, 0.69, 1)
 
     def confirm_answer(self):
         if not self.current_letter:
@@ -3618,9 +4188,9 @@ class HardPracticeScreen(BaseScreen):
         grid = self.ids.correction_grid
         if not grid.children:
             for i in [0, 3, 1, 4, 2, 5]:
-                btn = Button(
-                    text='*', font_size=dp(24), width=dp(60), height=dp(60),
+                btn = Factory.DotButton(
                     size_hint=(None, None),
+                    size=(dp(68), dp(68)),
                 )
                 btn.bind(on_press=lambda instance, index=i: self.on_correction_dot_press(index, instance))
                 self.correction_dot_buttons.append(btn)
@@ -3663,10 +4233,12 @@ class HardPracticeScreen(BaseScreen):
         if self.has_error:
             for btn in self.ids.braille_word_box.children:
                 if btn.char_index == self.error_index:
-                    btn.background_color = (0, 1, 0, 1)
+                    btn.background_color = (0.02, 0.59, 0.41, 1)
+                    btn.color = (1, 1, 1, 1)
                     break
         else:
-            self.ids.no_error_btn.background_color = (0, 1, 0, 1)
+            self.ids.no_error_btn.background_color = (0.02, 0.59, 0.41, 1)
+            self.ids.no_error_btn.color = (1, 1, 1, 1)
 
         self.app.quick_streak = max(0, self.app.quick_streak - 1)
         self.update_streak_text(score_key="hard_practice")
@@ -3751,7 +4323,8 @@ class HardPracticeScreen(BaseScreen):
 
         for btn in self.ids.braille_word_box.children:
             if btn.char_index == self.error_index:
-                btn.background_color = (0, 1, 0, 1) if user_correct else (1, 0, 0, 1)
+                btn.background_color = (0.02, 0.59, 0.41, 1) if user_correct else (0.86, 0.15, 0.15, 1)
+                btn.color = (1, 1, 1, 1)
                 break
 
         if self.has_error and self.error_index >= 0:
@@ -3772,12 +4345,12 @@ class HardPracticeScreen(BaseScreen):
 
         if hasattr(self.ids, 'no_error_btn'):
             self.ids.no_error_btn.disabled = False
-            self.ids.no_error_btn.background_color = (1, 1, 1, 1)
+            self.ids.no_error_btn.background_color = self.app.card_color
 
         self.user_input = [0] * 6
 
         for btn in self.correction_dot_buttons:
-            btn.background_color = (1, 1, 1, 1)
+            btn.background_color = self.app.card_color
 
     def update_braille_display(self):
         box = self.ids.braille_word_box
@@ -3796,7 +4369,6 @@ class HardPracticeScreen(BaseScreen):
         if lock_all:
             self.disable_children(self.ids.braille_word_box)
             self.ids.no_error_btn.disabled = True
-            self.ids.no_error_btn.disabled_color = (1, 1, 1, 1)
 
     def on_braille_char_press(self, instance):
         if self._controls_locked: return
@@ -3805,24 +4377,29 @@ class HardPracticeScreen(BaseScreen):
 
         if self.has_error and instance.char_index == self.error_index:
             if self.sub_mode == 'A':
-                instance.background_color = (0, 1, 0, 1)
+                instance.background_color = (0.02, 0.59, 0.41, 1)
+                instance.color = (1, 1, 1, 1)
                 self.app.update_char_stat(self.current_word[self.error_index], True)
                 self.handle_correct_answer()
             else:
-                instance.background_color = (1, 0.7, 0, 1)
+                instance.background_color = (0.961, 0.62, 0.043, 1)
+                instance.color = (1, 1, 1, 1)
                 self.correction_panel_visible = True
                 self._controls_locked = False
 
         else:
-            instance.background_color = (1, 0, 0, 1)
+            instance.background_color = (0.86, 0.15, 0.15, 1)
+            instance.color = (1, 1, 1, 1)
             if self.has_error:
                 self.app.update_char_stat(self.current_word[self.error_index], False)
                 for btn in self.ids.braille_word_box.children:
                     if btn.char_index == self.error_index:
-                        btn.background_color = (0, 1, 0, 1)
+                        btn.background_color = (0.02, 0.59, 0.41, 1)
+                        btn.color = (1, 1, 1, 1)
                         break
             else:
-                self.ids.no_error_btn.background_color = (0, 1, 0, 1)
+                self.ids.no_error_btn.background_color = (0.02, 0.59, 0.41, 1)
+                self.ids.no_error_btn.color = (1, 1, 1, 1)
 
             self.handle_wrong_answer()
 
@@ -3832,20 +4409,23 @@ class HardPracticeScreen(BaseScreen):
         self.lock_controls()
 
         if not self.has_error:
-            self.ids.no_error_btn.background_color = (0, 1, 0, 1)
+            self.ids.no_error_btn.background_color = (0.02, 0.59, 0.41, 1)
+            self.ids.no_error_btn.color = (1, 1, 1, 1)
             self.handle_correct_answer()
         else:
-            self.ids.no_error_btn.background_color = (1, 0, 0, 1)
+            self.ids.no_error_btn.background_color = (0.86, 0.15, 0.15, 1)
+            self.ids.no_error_btn.color = (1, 1, 1, 1)
             for btn in self.ids.braille_word_box.children:
                 if btn.char_index == self.error_index:
-                    btn.background_color = (0, 1, 0, 1)
+                    btn.background_color = (0.02, 0.59, 0.41, 1)
+                    btn.color = (1, 1, 1, 1)
                     break
             self.app.update_char_stat(self.current_word[self.error_index], False)
             self.handle_wrong_answer()
 
     def on_correction_dot_press(self, index, instance):
         self.user_input[index] = 1 - self.user_input[index]
-        instance.background_color = (0.7, 0.7, 0.7, 1) if self.user_input[index] else (1, 1, 1, 1)
+        instance.background_color = self.app.accent_color if self.user_input[index] else self.app.card_color
 
 
 class MemoryCard(Button):
@@ -3859,7 +4439,6 @@ class MemoryCard(Button):
     def __init__(self, screen, **kwargs):
         super().__init__(**kwargs)
         self.screen = screen
-        self.disabled_color = (1, 1, 1, 1)
         self.background_normal = ''
         self.background_down = ''
         self.background_disabled_normal = ''
@@ -4318,8 +4897,8 @@ class BrailleWordSearchScreen(BaseScreen):
                 font_name="BrailleFont",
                 background_normal="",
                 background_down="",
-                background_color=(0.2, 0.2, 0.2, 1),
-                color=(1, 1, 1, 1),
+                background_color=self.app.ws_base_bg,
+                color=self.app.ws_base_fg,
                 padding=(0, 0),
                 halign="center",
                 valign="middle",
@@ -4362,7 +4941,7 @@ class BrailleWordSearchScreen(BaseScreen):
         parts = []
         for w in self.target_words:
             if w in self.found_words:
-                parts.append(f"[color=33aa3388]{w}[/color]")
+                parts.append(f"[color=05966999]{w}[/color]")
             else:
                 parts.append(w)
         self.words_line = "  ".join(parts)
@@ -4382,9 +4961,9 @@ class BrailleWordSearchScreen(BaseScreen):
     def _repaint(self):
         found_cells = self._found_cells_cache
 
-        base_bg, base_fg = (0.2, 0.2, 0.2, 1), (1, 1, 1, 1)
-        sel_bg, sel_fg = (0.7, 0.7, 0.7, 1), (0, 0, 0, 1)
-        found_bg, found_fg = (0.2, 0.7, 0.2, 1), (1, 1, 1, 1)
+        base_bg, base_fg = self.app.ws_base_bg, self.app.ws_base_fg
+        sel_bg, sel_fg = self.app.ws_sel_bg, self.app.ws_sel_fg
+        found_bg, found_fg = self.app.ws_found_bg, self.app.ws_found_fg
 
         for btn in self.cells:
             idx = btn.ws_index
@@ -4398,9 +4977,9 @@ class BrailleWordSearchScreen(BaseScreen):
     def _repaint_delta(self, *, old_removed: set[int], new_added: set[int]):
         found = self._found_cells_cache
 
-        base_bg, base_fg = (0.2, 0.2, 0.2, 1), (1, 1, 1, 1)
-        sel_bg, sel_fg = (0.7, 0.7, 0.7, 1), (0, 0, 0, 1)
-        found_bg, found_fg = (0.2, 0.7, 0.2, 1), (1, 1, 1, 1)
+        base_bg, base_fg = self.app.ws_base_bg, self.app.ws_base_fg
+        sel_bg, sel_fg = self.app.ws_sel_bg, self.app.ws_sel_fg
+        found_bg, found_fg = self.app.ws_found_bg, self.app.ws_found_fg
 
         def apply(idx: int):
             btn = self.cells[idx]
@@ -4807,7 +5386,7 @@ class TranslatorScreen(BaseScreen):
                 font_name='BrailleFont',
                 font_size=fs,
                 size_hint_y=None,
-                color=(1, 1, 1, 1),
+                color=(0.059, 0.090, 0.165, 1),
                 halign='center',
                 valign='top'
             )
@@ -4823,7 +5402,7 @@ class TranslatorScreen(BaseScreen):
     def on_braille_dot_press(self, index):
         self.user_braille_dots[index] = 1 - self.user_braille_dots[index]
         btn = self.dot_buttons[index]
-        btn.background_color = (0.7, 0.7, 0.7, 1) if self.user_braille_dots[index] else (1, 1, 1, 1)
+        btn.background_color = self.app.accent_color if self.user_braille_dots[index] else self.app.card_color
 
     def open_braille_input(self):
         self.braille_input_active = not self.braille_input_active
@@ -4864,7 +5443,7 @@ class TranslatorScreen(BaseScreen):
     def clear_braille_input(self):
         self.user_braille_dots = [0] * 6
         for btn in self.dot_buttons:
-            btn.background_color = (1, 1, 1, 1)
+            btn.background_color = self.app.card_color
 
     def on_leave(self, *args):
         super().on_leave(*args)
@@ -4882,6 +5461,9 @@ class SettingsScreen(BaseScreen):
     time_label = StringProperty()
     time_hint = StringProperty()
     use_stats = StringProperty()
+    theme_label = StringProperty()
+    theme_values = ListProperty([])
+    current_theme_str = StringProperty()
     reset_stats_btn = StringProperty()
     reset_lessons_btn = StringProperty()
     general_settings_header = StringProperty()
@@ -4906,6 +5488,12 @@ class SettingsScreen(BaseScreen):
         self.language_label = self.get_translation('language_label')
         self.difficulty_label = self.get_translation('difficulty_label')
         self.use_stats = self.get_translation('use_stats')
+        self.theme_label = self.get_translation('theme')
+        self.theme_values = [
+            self.get_translation('theme_light'),
+            self.get_translation('dark_mode'),
+        ]
+        self.current_theme_str = self.theme_values[1 if self.app.dark_mode else 0]
         self.reset_stats_btn = self.get_translation('reset_stats_btn')
         self.reset_lessons_btn = self.get_translation('reset_lessons_btn')
         self.time_label = self.get_translation('time_label')
@@ -4957,6 +5545,16 @@ class SettingsScreen(BaseScreen):
 
     def update_update_use_stats(self, active):
         self.app.use_stats = active
+        self.app.save_settings()
+
+    def toggle_dark_mode(self, active):
+        self.app.dark_mode = active
+        self.app.apply_theme()
+        self.app.save_settings()
+
+    def update_theme(self, value):
+        self.app.dark_mode = (value == self.theme_values[1])
+        self.app.apply_theme()
         self.app.save_settings()
 
     def toggle_mode_flag(self, attr: str, value: bool, other_attr: str, other_switch_id: str):
@@ -5115,6 +5713,31 @@ class BrailleApp(App):
     quick_mode_easy_words = BooleanProperty(True)
     quick_mode_medium = BooleanProperty(True)
     quick_mode_hard = BooleanProperty(True)
+    dark_mode = BooleanProperty(False)
+    theme_tick = NumericProperty(0)
+    base_fg = ListProperty([1, 1, 1, 1])
+
+    bg_color = ListProperty([0.957, 0.965, 0.984, 1])
+    border_color = ListProperty([0.890, 0.910, 0.941, 1])
+    card_color = ListProperty([1, 1, 1, 1])
+    field_color = ListProperty([1, 1, 1, 1])
+    text_color = ListProperty([0.059, 0.090, 0.165, 1])
+    text_soft_color = ListProperty([0.42, 0.47, 0.55, 1])
+    accent_color = ListProperty([0.31, 0.275, 0.898, 1])
+    dot_ring_color = ListProperty([0.878, 0.902, 0.937, 1])
+    track_color = ListProperty([0.925, 0.935, 0.955, 1])
+    overlay_color = ListProperty([0.09, 0.12, 0.19, 0.42])
+    mem_back_color = ListProperty([0.878, 0.906, 1.0, 1])
+    header_tint_color = ListProperty([0.933, 0.949, 1.0, 1])
+    ws_base_bg = ListProperty([1, 1, 1, 1])
+    ws_base_fg = ListProperty([0.059, 0.090, 0.165, 1])
+    ws_sel_bg = ListProperty([0.933, 0.949, 1.0, 1])
+    ws_sel_fg = ListProperty([0.263, 0.22, 0.792, 1])
+    ws_found_bg = ListProperty([0.925, 0.992, 0.961, 1])
+    ws_found_fg = ListProperty([0.016, 0.471, 0.341, 1])
+    locked_bg = ListProperty([0.92, 0.93, 0.95, 1])
+    locked_border = ListProperty([0.86, 0.88, 0.92, 1])
+    locked_text = ListProperty([0.66, 0.70, 0.77, 1])
     LESSON_STARS_MAX = 5
 
     _screen_classes = {
@@ -5145,7 +5768,8 @@ class BrailleApp(App):
         print(self.user_data_dir)
         self.braille_data = braille_data
         self.load_settings()
-        sm = ScreenManager()
+        self.apply_theme()
+        sm = ScreenManager(transition=FadeTransition(duration=0.22))
         self._load_screen(sm, 'menu')
         Clock.schedule_once(self._deferred_init, 0.05)
 
@@ -5424,6 +6048,55 @@ class BrailleApp(App):
 
         os.replace(tmp, path)
 
+    def apply_theme(self):
+        dark = self.dark_mode
+        if dark:
+            self.bg_color = [0.055, 0.063, 0.09, 1]
+            self.border_color = [0.17, 0.19, 0.27, 1]
+            self.card_color = [0.11, 0.13, 0.19, 1]
+            self.field_color = [0.13, 0.15, 0.21, 1]
+            self.text_color = [0.93, 0.945, 0.98, 1]
+            self.text_soft_color = [0.58, 0.62, 0.70, 1]
+            self.accent_color = [0.58, 0.55, 1.0, 1]
+            self.dot_ring_color = [0.22, 0.24, 0.33, 1]
+            self.track_color = [0.12, 0.14, 0.20, 1]
+            self.overlay_color = [0, 0, 0, 0.55]
+            self.mem_back_color = [0.13, 0.15, 0.23, 1]
+            self.header_tint_color = [0.15, 0.16, 0.26, 1]
+            self.ws_base_bg = [0.11, 0.13, 0.19, 1]
+            self.ws_base_fg = [0.93, 0.945, 0.98, 1]
+            self.ws_sel_bg = [0.24, 0.22, 0.60, 1]
+            self.ws_sel_fg = [1, 1, 1, 1]
+            self.ws_found_bg = [0.03, 0.26, 0.19, 1]
+            self.ws_found_fg = [0.62, 0.95, 0.82, 1]
+            self.locked_bg = [0.075, 0.085, 0.125, 1]
+            self.locked_border = [0.05, 0.058, 0.085, 1]
+            self.locked_text = [0.45, 0.49, 0.57, 1]
+        else:
+            self.bg_color = [0.957, 0.965, 0.984, 1]
+            self.border_color = [0.890, 0.910, 0.941, 1]
+            self.card_color = [1, 1, 1, 1]
+            self.field_color = [1, 1, 1, 1]
+            self.text_color = [0.059, 0.090, 0.165, 1]
+            self.text_soft_color = [0.42, 0.47, 0.55, 1]
+            self.accent_color = [0.31, 0.275, 0.898, 1]
+            self.dot_ring_color = [0.878, 0.902, 0.937, 1]
+            self.track_color = [0.925, 0.935, 0.955, 1]
+            self.overlay_color = [0.09, 0.12, 0.19, 0.42]
+            self.mem_back_color = [0.878, 0.906, 1.0, 1]
+            self.header_tint_color = [0.933, 0.949, 1.0, 1]
+            self.ws_base_bg = [1, 1, 1, 1]
+            self.ws_base_fg = [0.059, 0.090, 0.165, 1]
+            self.ws_sel_bg = [0.933, 0.949, 1.0, 1]
+            self.ws_sel_fg = [0.263, 0.22, 0.792, 1]
+            self.ws_found_bg = [0.925, 0.992, 0.961, 1]
+            self.ws_found_fg = [0.016, 0.471, 0.341, 1]
+            self.locked_bg = [0.92, 0.93, 0.95, 1]
+            self.locked_border = [0.86, 0.88, 0.92, 1]
+            self.locked_text = [0.66, 0.70, 0.77, 1]
+        self.btn_gradient = _create_gradient_texture(dark)
+        self.theme_tick += 1
+
     def load_settings(self):
         try:
             with open(self._path("settings.json"), "r", encoding="utf-8") as f:
@@ -5443,6 +6116,7 @@ class BrailleApp(App):
             self.quick_mode_hard = data.get('quick_mode_hard', True)
             self.memo_mode_letters = data.get('memo_mode_letters', True)
             self.memo_mode_digits = data.get('memo_mode_digits', True)
+            self.dark_mode = data.get('dark_mode', False)
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
@@ -5466,6 +6140,7 @@ class BrailleApp(App):
             'quick_mode_hard': self.quick_mode_hard,
             'memo_mode_letters': self.memo_mode_letters,
             'memo_mode_digits': self.memo_mode_digits,
+            'dark_mode': self.dark_mode,
         }
         self._atomic_json_dump("settings.json", data)
 
@@ -5534,6 +6209,9 @@ class BrailleApp(App):
                 if hasattr(screen, 'quick_review_mode') and screen.quick_review_mode:
                     self.stop_quick_review()
                     self.switch_screen('practice_levels')
+                    return True
+                if current == 'lesson_study' and not screen.is_learning_active:
+                    screen.finish_lesson()
                     return True
                 if current == 'translator':
                     tr = self.get_screen('translator')
