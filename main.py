@@ -95,6 +95,12 @@ Builder.load_string('''
             radius: [dp(16)]
             texture: app.btn_gradient
 
+<RedButton@Button>:
+    # the global <-Button> rule binds color to app.text_color, which would
+    # wipe the red on theme switches — referencing app.theme_tick here makes
+    # Kivy re-evaluate (and re-assert) this color at the end of apply_theme()
+    color: 0.86, 0.15, 0.15, 1 if app.theme_tick >= 0 else 1
+
 <TabButton@Button>:
     font_size: dp(17)
     canvas.before:
@@ -1464,19 +1470,17 @@ Builder.load_string('''
                             width: dp(60)
                             on_active: root.update_update_use_stats(self.active)
 
-                    Button:
+                    RedButton:
                         text: root.reset_stats_btn
                         font_name: 'BrailleFont'
                         size_hint_y: None
                         height: dp(58)
-                        color: 0.86, 0.15, 0.15, 1
                         on_press: root.reset_stats()
-                    Button:
+                    RedButton:
                         text: root.reset_lessons_btn
                         font_name: 'BrailleFont'
                         size_hint_y: None
                         height: dp(58)
-                        color: 0.86, 0.15, 0.15, 1
                         on_press: root.reset_lessons_progress()
 
                 SettingsSection:
@@ -3041,6 +3045,10 @@ class LessonStudyScreen(BaseScreen):
                 size_hint_y=None,
                 height=dp(80)
             )
+
+            braille_label.color = self.app.accent_color
+            self.app.bind(
+                accent_color=lambda inst, v, lbl=braille_label: setattr(lbl, 'color', v))
             self._letters_table_widgets.append((letter_label, braille_label))
 
         if len(grid.children) != need_pairs * 2:
