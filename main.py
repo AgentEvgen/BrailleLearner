@@ -289,35 +289,39 @@ Builder.load_string('''
     height: dp(52)
     spacing: dp(8)
     streak_text: ''
+    record_text: ''
     time_left: 0
     quick_review_mode: False
 
-    Label:
-        text: root.streak_text.split('\\n')[0] if '\\n' in root.streak_text else root.streak_text
-        font_size: dp(17)
-        color: app.text_soft_color
-        halign: 'left'
-        valign: 'middle'
-        size_hint_x: 0.4
-        text_size: self.size
+    BoxLayout:
+        orientation: 'vertical'
+        spacing: dp(2)
+
+        Label:
+            text: root.streak_text
+            font_size: dp(17)
+            color: app.text_soft_color
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.width, None
+
+        Label:
+            text: root.record_text
+            font_size: dp(17)
+            color: app.text_soft_color
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.width, None
 
     Label:
         text: str(root.time_left) if root.quick_review_mode else ''
         font_size: dp(28)
         bold: True
         color: app.accent_color
-        halign: 'center'
-        valign: 'middle'
-        size_hint_x: 0.2
-        text_size: self.size
-
-    Label:
-        text: root.streak_text.split('\\n')[1] if '\\n' in root.streak_text else ''
-        font_size: dp(17)
-        color: app.text_soft_color
         halign: 'right'
         valign: 'middle'
-        size_hint_x: 0.4
+        size_hint_x: None
+        width: dp(64)
         text_size: self.size
 
 <MenuScreen>:
@@ -825,6 +829,8 @@ Builder.load_string('''
 
             StreakHeader:
                 streak_text: root.streak_text
+
+                record_text: root.record_text
                 time_left: root.time_left
                 quick_review_mode: root.quick_review_mode
 
@@ -892,6 +898,8 @@ Builder.load_string('''
 
             StreakHeader:
                 streak_text: root.streak_text
+
+                record_text: root.record_text
                 time_left: root.time_left
                 quick_review_mode: root.quick_review_mode
 
@@ -959,6 +967,8 @@ Builder.load_string('''
 
             StreakHeader:
                 streak_text: root.streak_text
+
+                record_text: root.record_text
                 time_left: root.time_left
                 quick_review_mode: root.quick_review_mode
 
@@ -1085,6 +1095,8 @@ Builder.load_string('''
 
                 StreakHeader:
                     streak_text: root.streak_text
+
+                    record_text: root.record_text
                     time_left: root.time_left
                     quick_review_mode: root.quick_review_mode
 
@@ -2457,7 +2469,7 @@ class BaseScreen(Screen):
         return ''.join(out)
 
     def update_streak_text(self, score_key, local_streak_attr="current_streak",
-                           streak_prop="streak_text", ):
+                           streak_prop="streak_text", record_prop="record_text", ):
         lang = self.app.current_language
 
         is_quick = bool(getattr(self, "quick_review_mode", False))
@@ -2466,7 +2478,19 @@ class BaseScreen(Screen):
         record_key = "quick" if is_quick else score_key
         record_value = int(self.app.high_scores.get(lang, {}).get(record_key, 0))
 
-        setattr(self, streak_prop, self.get_translation("streak").format(current_value, record_value))
+        streak_fmt = self.get_translation("streak")
+        record_fmt = self.get_translation("record")
+        try:
+            streak_txt = streak_fmt.format(current_value)
+        except (IndexError, KeyError):
+            streak_txt = streak_fmt
+        try:
+            record_txt = record_fmt.format(record_value)
+        except (IndexError, KeyError):
+            record_txt = record_fmt
+
+        setattr(self, streak_prop, streak_txt)
+        setattr(self, record_prop, record_txt)
 
     def start_timer(self, duration=None):
         self.stop_timer()
@@ -3444,6 +3468,7 @@ class PracticeLevelsScreen(BaseScreen):
 
 class PracticeScreen(BaseScreen):
     streak_text = StringProperty()
+    record_text = StringProperty()
     braille_char = StringProperty()
     time_left = NumericProperty(5)
     timer_active = BooleanProperty(False)
@@ -3717,6 +3742,7 @@ class PracticeScreen(BaseScreen):
 
 class EasyWordsPracticeScreen(BaseScreen):
     streak_text = StringProperty()
+    record_text = StringProperty()
     prompt_text = StringProperty()
     prompt_is_braille = BooleanProperty(False)
     time_left = NumericProperty(5)
@@ -4001,6 +4027,7 @@ class MediumPracticeScreen(BaseScreen):
     dot_buttons = ListProperty([])
     current_streak = NumericProperty(0)
     streak_text = StringProperty()
+    record_text = StringProperty()
     confirm_btn = StringProperty()
     hint_btn = StringProperty()
     quick_review_mode = BooleanProperty(False)
@@ -4218,7 +4245,8 @@ class MediumPracticeScreen(BaseScreen):
 
 
 class HardPracticeScreen(BaseScreen):
-    streak_text = StringProperty(" \n ")
+    streak_text = StringProperty()
+    record_text = StringProperty()
     current_word_text = StringProperty()
     no_errors_btn = StringProperty()
     confirm_btn = StringProperty()
