@@ -98,8 +98,14 @@
 - Папка **assets** *(включена в репозиторий)*
 
 ### Сборка
-Используйте файл **setup.sh**, либо проделайте эти шаги вручную:
 ```bash
+
+# Автоматическая установка с помощью **setup.sh**:
+chmod +x setup.sh
+./setup.sh
+
+# --- ИЛИ ВРУЧНУЮ ---
+
 # Скачайте необходимые зависимости
 sudo apt update
 sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev python3-dev python3-pip python3-setuptools python3-venv openjdk-17-jdk libtinfo6
