@@ -2315,7 +2315,10 @@ def load_braille_data():
                         and len(dots) == 6
                         and all(x in (0, 1) for x in dots)
                 ):
-                    valid_lang_map[char] = dots
+                    # normalize the symbol key to UPPERCASE so the app works
+                    # regardless of the case used in the asset file (the rest
+                    # of the code looks symbols up in uppercase)
+                    valid_lang_map[char.upper()] = dots
                 else:
                     print(f"Invalid braille entry in {path}: {char} -> {dots}")
 
