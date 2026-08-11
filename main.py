@@ -96,9 +96,6 @@ Builder.load_string('''
             texture: app.btn_gradient
 
 <RedButton@Button>:
-    # the global <-Button> rule binds color to app.text_color, which would
-    # wipe the red on theme switches — referencing app.theme_tick here makes
-    # Kivy re-evaluate (and re-assert) this color at the end of apply_theme()
     color: 0.86, 0.15, 0.15, 1 if app.theme_tick >= 0 else 1
 
 <TabButton@Button>:
@@ -3491,6 +3488,7 @@ class PracticeScreen(BaseScreen):
 
         if self.correct_button:
             self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
+            self.correct_button.color = (1, 1, 1, 1)
 
         if self.current_symbol:
             self.app.update_char_stat(self.current_symbol, False)
@@ -3957,6 +3955,7 @@ class EasyWordsPracticeScreen(BaseScreen):
 
         if self.correct_button:
             self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
+            self.correct_button.color = (1, 1, 1, 1)
 
         if self.current_word:
             self._apply_word_stats(False)
@@ -4078,6 +4077,10 @@ class MediumPracticeScreen(BaseScreen):
 
     def handle_timeout(self):
         self.stop_timer()
+
+        if self.quick_review_mode and self.user_input != [0] * 6:
+            self.confirm_answer()
+            return
 
         self._disable_and_show_correct_answer()
 
