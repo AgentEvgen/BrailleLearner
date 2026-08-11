@@ -96,6 +96,9 @@ Builder.load_string('''
             texture: app.btn_gradient
 
 <RedButton@Button>:
+    # the global <-Button> rule binds color to app.text_color, which would
+    # wipe the red on theme switches — referencing app.theme_tick here makes
+    # Kivy re-evaluate (and re-assert) this color at the end of apply_theme()
     color: 0.86, 0.15, 0.15, 1 if app.theme_tick >= 0 else 1
 
 <TabButton@Button>:
@@ -2047,6 +2050,7 @@ Builder.load_string('''
                             on_press: root.confirm_braille_input()
 
                         Button:
+                            id: delete_btn
                             text: root.delete_btn
                             font_name: 'BrailleFont'
                             size_hint: 0.5, 1
@@ -2315,9 +2319,6 @@ def load_braille_data():
                         and len(dots) == 6
                         and all(x in (0, 1) for x in dots)
                 ):
-                    # normalize the symbol key to UPPERCASE so the app works
-                    # regardless of the case used in the asset file (the rest
-                    # of the code looks symbols up in uppercase)
                     valid_lang_map[char.upper()] = dots
                 else:
                     print(f"Invalid braille entry in {path}: {char} -> {dots}")
@@ -5343,11 +5344,17 @@ class TranslatorScreen(BaseScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.input_number_mode = False
+        self._delete_initial = None
+        self._delete_interval = None
 
     def on_kv_post(self, base_widget):
         self.dot_buttons = [
             self.ids.dot1_trans, self.ids.dot2_trans, self.ids.dot3_trans,
             self.ids.dot4_trans, self.ids.dot5_trans, self.ids.dot6_trans]
+        self.ids.delete_btn.bind(
+            on_touch_down=self._on_delete_hold_down,
+            on_touch_up=self._on_delete_hold_up,
+        )
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
@@ -5509,6 +5516,7 @@ class TranslatorScreen(BaseScreen):
             panel.disabled = True
 
     def close_braille_input(self):
+        self._cancel_delete_repeat()
         self.braille_input_active = False
         if self.ids:
             panel = self.ids.get('braille_input_panel')
@@ -5530,6 +5538,38 @@ class TranslatorScreen(BaseScreen):
 
     def delete_last_char(self):
         self.ids.input_text.do_backspace()
+
+    DELETE_REPEAT_DELAY = 0.45
+    DELETE_REPEAT_INTERVAL = 0.03
+
+    def _on_delete_hold_down(self, btn, touch):
+        if not btn.collide_point(*touch.pos):
+            return
+        self._start_delete_repeat()
+
+    def _on_delete_hold_up(self, btn, touch):
+        self._cancel_delete_repeat()
+
+    def _start_delete_repeat(self):
+        self._cancel_delete_repeat()
+        self._delete_initial = Clock.schedule_once(
+            self._begin_delete_repeat, self.DELETE_REPEAT_DELAY)
+
+    def _begin_delete_repeat(self, dt):
+        self._delete_initial = None
+        self._delete_interval = Clock.schedule_interval(
+            self._repeat_delete, self.DELETE_REPEAT_INTERVAL)
+
+    def _repeat_delete(self, dt):
+        self.delete_last_char()
+
+    def _cancel_delete_repeat(self):
+        if self._delete_initial is not None:
+            self._delete_initial.cancel()
+            self._delete_initial = None
+        if self._delete_interval is not None:
+            self._delete_interval.cancel()
+            self._delete_interval = None
 
     def clear_braille_input(self):
         self.user_braille_dots = [0] * 6
