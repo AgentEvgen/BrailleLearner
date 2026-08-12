@@ -2553,8 +2553,8 @@ class BaseScreen(Screen):
         if not getattr(self.app, 'use_stats', True):
             return 1.0
 
-        lang = self.app.current_language
-        stats_lang = self.app.stats.setdefault(lang, {})
+        key = self.app.stats_key_for(char)
+        stats_lang = self.app.stats.setdefault(key, {})
 
         if char not in stats_lang:
             stats_lang[char] = {
@@ -2808,6 +2808,10 @@ class LessonRow(BoxLayout):
 
 
 class CoursesScreen(BaseScreen):
+    """List of available courses: one per language (letters) + a common
+    digits course. Picking a course opens its lessons WITHOUT changing the
+    interface language."""
+
     courses_title = StringProperty()
 
     def update_lang(self):
@@ -2878,6 +2882,8 @@ class LessonsScreen(BaseScreen):
         self.lessons_title = f"{base} · {subtitle}"
 
     def open_course(self, lang, mode='letters'):
+        """Open a course without touching the interface language:
+        lang = 'digits' selects the common digits course."""
         self.lesson_lang = lang
         self.current_mode = mode
         self.update_lang()
@@ -5372,10 +5378,13 @@ class ReferenceScreen(BaseScreen):
             "stats": "",
         })
 
+        letters_stats = self.app.stats.get(lang, {})
+        digits_stats = self.app.stats.get('digits', {})
+
         for ch, dots in letters_items:
             braille_char = self.get_braille_char(dots)
 
-            st = self.app.stats[lang].get(ch, {"correct": 0, "wrong": 0})
+            st = letters_stats.get(ch, {"correct": 0, "wrong": 0})
             stats_text = stats_fmt.format(st["correct"], st["wrong"])
 
             data.append({
@@ -5396,7 +5405,7 @@ class ReferenceScreen(BaseScreen):
         for d, dots in digits_items:
             braille_char = ns + self.get_braille_char(dots)
 
-            st = self.app.stats[lang].get(d, {"correct": 0, "wrong": 0})
+            st = digits_stats.get(d, {"correct": 0, "wrong": 0})
             stats_text = stats_fmt.format(st["correct"], st["wrong"])
 
             data.append({
@@ -5413,12 +5422,16 @@ class ReferenceScreen(BaseScreen):
         lang = self.app.current_language
         fmt = self.get_translation('stats_label')
 
+        letters_stats = self.app.stats.get(lang, {})
+        digits_stats = self.app.stats.get('digits', {})
+
         data = self.ids.rv.data
         for row in data:
             if row.get("is_header"):
                 continue
             key = row.get("symbol")
-            st = self.app.stats[lang].get(key, {"correct": 0, "wrong": 0})
+            bucket = digits_stats if key in digits_data else letters_stats
+            st = bucket.get(key, {"correct": 0, "wrong": 0})
             row["stats"] = fmt.format(st["correct"], st["wrong"])
 
         self.ids.rv.refresh_from_data()
@@ -5644,6 +5657,7 @@ class TranslatorScreen(BaseScreen):
     def _on_delete_hold_down(self, btn, touch):
         if not btn.collide_point(*touch.pos):
             return
+
         self._start_delete_repeat()
 
     def _on_delete_hold_up(self, btn, touch):
@@ -5867,6 +5881,7 @@ class SettingsScreen(BaseScreen):
 
         def do_reset():
             self.app.stats[lang] = {}
+            self.app.stats['digits'] = {}
             self.app.save_stats()
 
         self.show_popup(
@@ -6120,14 +6135,24 @@ class BrailleApp(App):
             self.switch_screen('hard_practice')
             scr.new_question()
 
+    def stats_key_for(self, char):
+        """Which stats bucket a symbol belongs to.
+
+        Digits (and later other symbol categories) keep their own bucket
+        (like a separate language) instead of per-language digit stats.
+        """
+        if char in digits_data:
+            return 'digits'
+        return self.current_language
+
     def update_char_stat(self, char, is_correct):
         if not self.use_stats:
             return
 
-        lang = self.current_language
-        self.stats.setdefault(lang, {})
+        key = self.stats_key_for(char)
+        self.stats.setdefault(key, {})
 
-        stat = self.stats[lang].setdefault(char, {
+        stat = self.stats[key].setdefault(char, {
             'correct': 0, 'wrong': 0, 'last_seen': 0,
             'interval': 0, 'ef': 2.5, 'reps': 0
         })
@@ -6404,6 +6429,8 @@ class BrailleApp(App):
 
         for lang in self.get_available_languages():
             data.setdefault(lang, {})
+
+        data.setdefault('digits', {})
 
         self.stats = data
 
