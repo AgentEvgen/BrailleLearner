@@ -96,20 +96,7 @@ Builder.load_string('''
             texture: app.btn_gradient
 
 <RedButton@Button>:
-    # the global <-Button> rule binds color to app.text_color, which would
-    # wipe the red on theme switches — referencing app.theme_tick here makes
-    # Kivy re-evaluate (and re-assert) this color at the end of apply_theme()
     color: 0.86, 0.15, 0.15, 1 if app.theme_tick >= 0 else 1
-
-<TabButton@Button>:
-    font_size: dp(17)
-    canvas.before:
-        Color:
-            rgba: self.background_color
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: [self.height / 2]
 
 <-DotButton@Button>:
     size_hint: None, None
@@ -395,7 +382,7 @@ Builder.load_string('''
                     font_size: dp(20)
                     size_hint_y: None
                     height: dp(62)
-                    on_press: app.switch_screen('lessons')
+                    on_press: app.switch_screen('courses')
 
                 Button:
                     text: root.practice
@@ -522,7 +509,7 @@ Builder.load_string('''
                 width: dp(104)
                 height: dp(50)
                 font_size: dp(16)
-                on_press: app.switch_screen('menu')
+                on_press: app.switch_screen('courses')
 
             Label:
                 text: root.lessons_title
@@ -535,34 +522,6 @@ Builder.load_string('''
                 text_size: self.size
                 shorten: True
                 shorten_from: 'right'
-
-        BoxLayout:
-            size_hint_y: None
-            height: dp(56)
-            spacing: dp(4)
-            padding: dp(4)
-
-            canvas.before:
-                Color:
-                    rgba: app.track_color
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [dp(17)]
-
-            TabButton:
-                text: root.letters_tab_text
-                font_name: 'BrailleFont'
-                color: (1, 1, 1, 1) if root.current_mode == 'letters' else (app.text_soft_color)
-                background_color: (app.accent_color) if root.current_mode == 'letters' else (0, 0, 0, 0)
-                on_press: root.switch_mode('letters')
-
-            TabButton:
-                text: root.digits_tab_text
-                font_name: 'BrailleFont'
-                color: (1, 1, 1, 1) if root.current_mode == 'digits' else (app.text_soft_color)
-                background_color: (app.accent_color) if root.current_mode == 'digits' else (0, 0, 0, 0)
-                on_press: root.switch_mode('digits')
 
         RecycleView:
             id: lessons_rv
@@ -579,6 +538,82 @@ Builder.load_string('''
                 padding: [dp(2), dp(6)]
                 default_size: None, dp(132)
                 default_size_hint: 1, None
+
+<CourseCard@BoxLayout>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: self.minimum_height
+    padding: dp(16)
+    spacing: dp(10)
+
+    canvas.before:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(20)]
+        Color:
+            rgba: app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(19)]
+
+<CourseHeader@Label>:
+    size_hint_y: None
+    height: self.texture_size[1] + dp(10)
+    font_size: dp(17)
+    halign: 'left'
+    valign: 'middle'
+    bold: True
+    color: app.text_soft_color
+    text_size: self.width, None
+
+<CoursesScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        spacing: dp(8)
+        padding: [dp(18), dp(12), dp(18), dp(14)]
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(54)
+            spacing: dp(10)
+
+            Button:
+                text: root.back_btn
+                font_name: 'BrailleFont'
+                size_hint_x: None
+                width: dp(104)
+                height: dp(50)
+                font_size: dp(16)
+                on_press: app.switch_screen('menu')
+
+            Label:
+                text: root.courses_title
+                font_name: 'BrailleFont'
+                font_size: dp(28)
+                bold: True
+                color: app.text_color
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                shorten: True
+                shorten_from: 'right'
+
+        ScrollView:
+            size_hint_y: 1
+            do_scroll_x: False
+
+            BoxLayout:
+                id: courses_box
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(14)
+                padding: [dp(2), dp(4)]
 
 <LessonStudyScreen>:
     BoxLayout:
@@ -2772,11 +2807,59 @@ class LessonRow(BoxLayout):
     is_unlocked = BooleanProperty(True)
 
 
+class CoursesScreen(BaseScreen):
+    courses_title = StringProperty()
+
+    def update_lang(self):
+        super().update_lang()
+        self.courses_title = self.get_translation('training_title')
+
+    def on_pre_enter(self, *args):
+        self.update_lang()
+        self._build_list()
+
+    def _open_course(self, lang, mode='letters'):
+        scr = self.app.get_screen('lessons')
+        scr.open_course(lang, mode)
+        self.app.switch_screen('lessons')
+
+    def _add_section(self, box, title, items):
+        card = Factory.CourseCard()
+        header = Factory.CourseHeader(text=title, font_name='BrailleFont')
+        card.add_widget(header)
+        for label, cb in items:
+            btn = Button(
+                text=label,
+                font_name='BrailleFont',
+                font_size=dp(20),
+                size_hint_y=None,
+                height=dp(62),
+            )
+            btn.bind(on_press=cb)
+            card.add_widget(btn)
+        box.add_widget(card)
+
+    def _build_list(self):
+        box = self.ids.courses_box
+        box.clear_widgets()
+
+        letters_items = [
+            (name, lambda inst, c=code: self._open_course(c))
+            for code, name in LANGUAGES.items()
+        ]
+        self._add_section(box, self.get_translation('section_letters'), letters_items)
+
+        digits_items = [
+            (self.get_translation('section_digits'),
+             lambda inst: self._open_course('digits', 'digits')),
+        ]
+        self._add_section(box, self.get_translation('section_digits'), digits_items)
+
+
 class LessonsScreen(BaseScreen):
     lessons_title = StringProperty()
     current_mode = StringProperty('letters')
-    letters_tab_text = StringProperty()
-    digits_tab_text = StringProperty()
+    lesson_lang = StringProperty('en')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -2784,30 +2867,38 @@ class LessonsScreen(BaseScreen):
 
     def update_lang(self):
         super().update_lang()
-        self.lessons_title = self.get_translation('lessons_title')
-        self.letters_tab_text = self.get_translation('section_letters')
-        self.digits_tab_text = self.get_translation('section_digits')
+        self._update_title()
 
-    def on_pre_enter(self, *args):
+    def _update_title(self):
+        base = self.get_translation('lessons_title')
+        if self.current_mode == 'digits':
+            subtitle = self.get_translation('section_digits')
+        else:
+            subtitle = LANGUAGES.get(self.lesson_lang, self.lesson_lang)
+        self.lessons_title = f"{base} · {subtitle}"
+
+    def open_course(self, lang, mode='letters'):
+        self.lesson_lang = lang
+        self.current_mode = mode
         self.update_lang()
         self.refresh_lessons(force=True)
 
-    def switch_mode(self, mode):
-        self.current_mode = mode
+    def on_pre_enter(self, *args):
+        self.update_lang()
         self.refresh_lessons(force=True)
 
     def _progress_completed(self):
         app = self.app
         if self.current_mode == 'digits':
             return app.lessons_progress.get('digits_common', {}).get('completed_count', 0)
-        return app.lessons_progress.get(app.current_language, {}).get('completed_count', 0)
+        return app.lessons_progress.get(self.lesson_lang, {}).get('completed_count', 0)
 
     def _calc_built_key(self):
         app = self.app
-        lang = app.current_language
+        lang = self.lesson_lang
         completed = self._progress_completed()
         lessons_len = len(app.get_lessons(lang, self.current_mode))
-        return (lang, self.current_mode, completed, lessons_len)
+        return (lang, app.current_language, self.current_mode, completed, lessons_len)
 
     def refresh_lessons(self, force: bool = False):
         key = self._calc_built_key()
@@ -2818,7 +2909,7 @@ class LessonsScreen(BaseScreen):
 
     def populate_lessons(self):
         app = self.app
-        lang = app.current_language
+        lang = self.lesson_lang
         lessons = app.get_lessons(lang, self.current_mode)
         data = []
         is_previous_completed = True
@@ -2873,12 +2964,12 @@ class LessonsScreen(BaseScreen):
 
     def open_lesson(self, lesson_index):
         app = self.app
-        lang = app.current_language
+        lang = self.lesson_lang
         lesson = app.get_lessons(lang, self.current_mode)[lesson_index]
 
         if lesson['mode'] == 'study':
             scr = app.get_screen('lesson_study')
-            scr.set_lesson(lesson_index, lesson['letters'], self.current_mode)
+            scr.set_lesson(lesson_index, lesson['letters'], self.current_mode, lesson_lang=lang)
             app.switch_screen('lesson_study')
         else:
             scr = app.get_screen('lesson_test')
@@ -2888,7 +2979,8 @@ class LessonsScreen(BaseScreen):
                 lesson['letters'],
                 lesson_mode=lesson.get('mode', 'practice'),
                 is_final_exam=is_exam,
-                lesson_type=self.current_mode
+                lesson_type=self.current_mode,
+                lesson_lang=lang,
             )
             app.switch_screen('lesson_test')
 
@@ -2902,6 +2994,7 @@ class LessonStudyScreen(BaseScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.lesson_index = 0
+        self.lesson_lang = 'en'
         self.letters = []
         self.lesson_type = 'letters'
         self._i = 0
@@ -2921,10 +3014,12 @@ class LessonStudyScreen(BaseScreen):
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
 
-    def set_lesson(self, lesson_index, letters, lesson_type='letters'):
+    def set_lesson(self, lesson_index, letters, lesson_type='letters', lesson_lang=None):
         self.lesson_index = lesson_index
         self.letters = letters[:]
         self.lesson_type = lesson_type
+        if lesson_lang is not None:
+            self.lesson_lang = lesson_lang
         self.is_learning_active = True
         self._phase = 'learn'
         self._i = 0
@@ -2938,7 +3033,7 @@ class LessonStudyScreen(BaseScreen):
     def _dots_for_symbol(self, sym):
         if self.lesson_type == 'digits':
             return digits_data[sym]
-        return self.app.braille_data[self.app.current_language][sym]
+        return self.app.braille_data[self.lesson_lang][sym]
 
     def _reset_buttons_visual(self):
         for b in self._dot_btns:
@@ -3091,7 +3186,7 @@ class LessonStudyScreen(BaseScreen):
                 dots = digits_data[char]
                 braille_char = ns + self.get_braille_char(dots)
             else:
-                dots = self.app.braille_data[self.app.current_language][char]
+                dots = self.app.braille_data[self.lesson_lang][char]
                 braille_char = self.get_braille_char(dots)
 
             ll, bl = self._letters_table_widgets[i]
@@ -3238,7 +3333,7 @@ class LessonStudyScreen(BaseScreen):
         if self.is_learning_active:
             return
 
-        self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type, 5)
+        self.app.mark_lesson_completed(self.lesson_lang, self.lesson_index, self.lesson_type, 5)
         self.app.switch_screen('lessons')
 
     def on_kv_post(self, base_widget):
@@ -3263,6 +3358,7 @@ class LessonTestScreen(BaseScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.lesson_index = 0
+        self.lesson_lang = 'en'
         self.letters = []
         self.questions_total = 0
         self.question_list = []
@@ -3282,10 +3378,13 @@ class LessonTestScreen(BaseScreen):
         super().update_lang()
         self.test_title = self.get_translation('lesson_test_title')
 
-    def set_lesson(self, lesson_index, letters, *, lesson_mode='practice', is_final_exam=False, lesson_type='letters'):
+    def set_lesson(self, lesson_index, letters, *, lesson_mode='practice', is_final_exam=False,
+                   lesson_type='letters', lesson_lang=None):
         self.lesson_index = lesson_index
         self.letters = letters[:]
         self.lesson_type = lesson_type
+        if lesson_lang is not None:
+            self.lesson_lang = lesson_lang
         self.lesson_mode = lesson_mode
 
         if is_final_exam or lesson_mode == "exam":
@@ -3330,7 +3429,7 @@ class LessonTestScreen(BaseScreen):
         if is_digits:
             dots = digits_data[char]
         else:
-            dots = self.app.braille_data[self.app.current_language][char]
+            dots = self.app.braille_data[self.lesson_lang][char]
 
         self.invert_mode = random.random() < 0.5
 
@@ -3362,7 +3461,7 @@ class LessonTestScreen(BaseScreen):
                 if is_digits:
                     btn.text = ns + self.get_braille_char(digits_data[a])
                 else:
-                    btn.text = self.get_braille_char(self.app.braille_data[self.app.current_language][a])
+                    btn.text = self.get_braille_char(self.app.braille_data[self.lesson_lang][a])
                 btn.font_name = 'BrailleFont'
                 btn.font_size = dp(36)
             else:
@@ -3402,7 +3501,7 @@ class LessonTestScreen(BaseScreen):
         stars = max(0, min(stars, max_stars))
 
         if stars >= 1:
-            self.app.mark_lesson_completed(self.app.current_language, self.lesson_index, self.lesson_type, stars=stars)
+            self.app.mark_lesson_completed(self.lesson_lang, self.lesson_index, self.lesson_type, stars=stars)
 
         percent = int(ratio * 100)
         stars_line = f"[font=BrailleFont]{'★' * stars + '☆' * (max_stars - stars)}[/font]"
@@ -5873,6 +5972,7 @@ class BrailleApp(App):
 
     _screen_classes = {
         'menu': MenuScreen,
+        'courses': CoursesScreen,
         'lessons': LessonsScreen,
         'lesson_study': LessonStudyScreen,
         'lesson_test': LessonTestScreen,
@@ -6320,7 +6420,8 @@ class BrailleApp(App):
             current = self.root.current
 
             back_map = {
-                'lessons': 'menu',
+                'courses': 'menu',
+                'lessons': 'courses',
                 'lesson_study': 'lessons',
                 'lesson_test': 'lessons',
                 'practice_levels': 'menu',
