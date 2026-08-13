@@ -1,5 +1,6 @@
 from kivy.properties import StringProperty, DictProperty, BooleanProperty, ListProperty, NumericProperty
 from kivy.uix.bubble import Bubble, BubbleContent, BubbleButton
+from kivy.uix.textinput import TextInputCutCopyPaste
 from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 from kivy.core.text import Label as CoreLabel
 from kivy.core.clipboard import Clipboard
@@ -2342,6 +2343,51 @@ Builder.load_string('''
                         size_hint_y: None
                         height: dp(62)
                         on_press: app.switch_screen('word_search')
+
+<BubbleContent>:
+    background_image: ''
+    background_color: (0, 0, 0, 0)
+    padding: [dp(4), dp(4)]
+    spacing: dp(1)
+    canvas:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(18)]
+        Color:
+            rgba: app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(17)]
+
+<BubbleButton>:
+    background_normal: ''
+    background_down: ''
+    background_disabled_normal: ''
+    background_disabled_down: ''
+    background_color: (0, 0, 0, 0)
+    color: app.text_color
+    font_name: 'BrailleFont'
+    font_size: dp(14)
+    halign: 'center'
+    valign: 'middle'
+    size_hint_x: None
+    width: self.texture_size[0] + dp(14)
+    height: dp(36)
+    padding: [dp(6), 0]
+    canvas.before:
+        Clear
+        Color:
+            rgba: (app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.16) if self.state == 'down' else app.card_color
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+<TextInputCutCopyPaste>:
+    size: '140sp', '44sp'
 ''')
 
 def _create_gradient_texture(dark=False):
@@ -2462,62 +2508,97 @@ braille_data = load_braille_data()
 translations, LANGUAGES = load_translations()
 
 
-# _original_bubble_button_init = BubbleButton.__init__
-#
-#
-# def _update_bubble_text(instance, value):
-#     defaults = {
-#         'Copy': 'copy_popup',
-#         'Cut': 'cut_popup',
-#         'Paste': 'paste_popup',
-#         'Select All': 'select_all_popup'
-#     }
-#
-#     if value in defaults:
-#         app = App.get_running_app()
-#         if not app: return
-#         lang = getattr(app, 'current_language', 'en')
-#
-#         if 'translations' in globals():
-#             tr_data = globals()['translations']
-#             t_dict = tr_data.get(lang, tr_data['en'])
-#             key = defaults[value]
-#             if key in t_dict and t_dict[key] != value:
-#                 instance.text = t_dict[key]
-#
-#
-# def _update_bubble_width_tree(instance, size):
-#     new_btn_width = size[0] + dp(40)
-#
-#     if instance.width != new_btn_width:
-#         instance.width = new_btn_width
-#
-#     content = instance.parent
-#     if content and isinstance(content, BubbleContent):
-#         content.size_hint_x = None
-#         content.width = content.minimum_width
-#
-#         bubble = content.parent
-#         if bubble and isinstance(bubble, Bubble):
-#             bubble.size_hint_x = None
-#             bubble.width = content.width + dp(32)
-#
-#
-# def _localized_bubble_button_init(self, **kwargs):
-#     _original_bubble_button_init(self, **kwargs)
-#
-#     if self.text:
-#         _update_bubble_text(self, self.text)
-#     self.bind(text=_update_bubble_text)
-#
-#     self.size_hint_x = None
-#
-#     self.bind(texture_size=_update_bubble_width_tree)
-#
-#     if self.texture_size:
-#         Clock.schedule_once(lambda dt: _update_bubble_width_tree(self, self.texture_size), 0)
-#
-# BubbleButton.__init__ = _localized_bubble_button_init
+_bubble_translations = {
+    'Copy': ('copy', 'copy_popup'),
+    'Cut': ('cut_popup',),
+    'Paste': ('paste_popup',),
+    'Select All': ('select_all_popup',),
+}
+
+
+_original_bubble_button_init = BubbleButton.__init__
+
+
+def _localize_bubble_text(instance, value):
+    app = App.get_running_app()
+    if app is None:
+        return
+    if value in _bubble_translations:
+        instance._bubble_original = value
+    orig = getattr(instance, '_bubble_original', None)
+    if orig is None:
+        return
+    t_dict = translations.get(getattr(app, 'current_language', 'en'),
+                              translations.get('en', {}))
+    translated = None
+    for k in _bubble_translations.get(orig, ()):
+        translated = t_dict.get(k)
+        if translated:
+            break
+    if translated and translated != orig:
+        instance.text = translated
+    elif instance.text != orig:
+        instance.text = orig
+    instance.texture_update()
+
+
+def _localized_bubble_button_init(self, **kwargs):
+    _original_bubble_button_init(self, **kwargs)
+    self.bind(text=_localize_bubble_text)
+    if self.text:
+        _localize_bubble_text(self, self.text)
+    self.texture_update()
+
+
+BubbleButton.__init__ = _localized_bubble_button_init
+
+
+_original_ticcp_init = TextInputCutCopyPaste.__init__
+
+
+def _fit_bubble_size(self):
+    content = self.content
+    if content is None:
+        return
+    children = list(content.children)
+    if not children:
+        return
+    if isinstance(content.padding, (list, tuple)):
+        pad_l, pad_t, pad_r, pad_b = content.padding
+    else:
+        pad_l = pad_t = pad_r = pad_b = content.padding
+    spacing = getattr(content, 'spacing', 0)
+    total_w = sum(c.width for c in children) + pad_l + pad_r + spacing * (len(children) - 1)
+    max_h = max(c.height for c in children) + pad_t + pad_b
+    amx, amy = self.arrow_margin
+    base_w = dp(150)
+    base_h = dp(50)
+    cap_w = max(base_w, Window.width - dp(20))
+    self.width = max(base_w, min(total_w + amx, cap_w))
+    self.height = max(base_h, max_h + amy)
+
+
+def _localized_ticcp_init(self, **kwargs):
+    _original_ticcp_init(self, **kwargs)
+    self.on_parent(self, None)
+    self._fit_bubble_size()
+
+
+_original_ticcp_on_parent = TextInputCutCopyPaste.on_parent
+
+
+def _ticcp_on_parent(self, instance, value):
+    _original_ticcp_on_parent(self, instance, value)
+    if value is not None:
+        for child in list(self.content.children):
+            if isinstance(child, BubbleButton):
+                _localize_bubble_text(child, child.text)
+        self._fit_bubble_size()
+
+
+TextInputCutCopyPaste.__init__ = _localized_ticcp_init
+TextInputCutCopyPaste.on_parent = _ticcp_on_parent
+TextInputCutCopyPaste._fit_bubble_size = _fit_bubble_size
 
 
 class BaseScreen(Screen):
@@ -6221,6 +6302,11 @@ class BrailleApp(App):
                         screen.update_lang()
                 except:
                     pass
+        for w in list(Window.children):
+            if isinstance(w, TextInputCutCopyPaste):
+                for btn in list(w.content.children):
+                    if isinstance(btn, BubbleButton):
+                        _localize_bubble_text(btn, btn.text)
 
     def get_available_languages(self):
         return list(LANGUAGES.keys())
