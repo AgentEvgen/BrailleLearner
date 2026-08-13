@@ -1276,7 +1276,7 @@ Builder.load_string('''
                 font_name: 'BrailleFont'
                 font_size: dp(18)
                 color: app.text_soft_color
-                halign: 'right'
+                halign: 'left'
                 valign: 'middle'
                 size_hint_x: 1
                 text_size: self.size
@@ -1314,7 +1314,7 @@ Builder.load_string('''
                 font_name: 'BrailleFont'
                 font_size: dp(18)
                 color: app.text_soft_color
-                halign: 'right'
+                halign: 'left'
                 valign: 'middle'
                 size_hint_x: 1
                 text_size: self.size
@@ -1852,6 +1852,48 @@ Builder.load_string('''
         text_size: self.size
         color: (app.accent_color) if root.is_header else (app.accent_color)
 
+<ReferenceCategory>:
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(60)
+    padding: [dp(18), 0]
+    spacing: dp(10)
+
+    canvas.before:
+        Color:
+            rgba: app.border_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(20)]
+        Color:
+            rgba: app.card_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(19)]
+
+    Label:
+        text: root.cat_title
+        font_name: 'BrailleFont'
+        font_size: dp(20)
+        bold: True
+        color: app.text_color
+        halign: 'left'
+        valign: 'middle'
+        text_size: self.size
+
+    Label:
+        text: root.cat_arrow
+        font_name: 'BrailleFont'
+        font_size: dp(18)
+        color: app.accent_color
+        size_hint_x: None
+        width: dp(30)
+        halign: 'center'
+        valign: 'middle'
+        text_size: self.size
+
 <ReferenceScreen>:
     BoxLayout:
         orientation: 'vertical'
@@ -1885,22 +1927,71 @@ Builder.load_string('''
                 shorten: True
                 shorten_from: 'right'
 
-        RecycleView:
-            id: rv
-            bar_width: dp(3)
-            scroll_type: ['bars', 'content']
-            do_scroll_x: False
-            viewclass: 'ReferenceRow'
+        BoxLayout:
+            id: cats_box
+            orientation: 'vertical'
+            spacing: dp(12)
+            padding: [dp(2), dp(2)]
 
-            RecycleBoxLayout:
-                default_size: None, dp(72)
-                default_size_hint: 1, None
-                size_hint_y: None
-                height: self.minimum_height
+            ReferenceCategory:
+                id: letters_cat
+                cat_title: root.letters_cat_text
+
+            BoxLayout:
+                id: letters_container
                 orientation: 'vertical'
-                spacing: dp(8)
-                padding: dp(2), dp(6), dp(2), dp(6)
+                size_hint_y: None
+                height: 0
+                opacity: 0
+                disabled: True
 
+                RecycleView:
+                    id: letters_rv
+                    bar_width: dp(3)
+                    scroll_type: ['bars', 'content']
+                    do_scroll_x: False
+                    viewclass: 'ReferenceRow'
+
+                    RecycleBoxLayout:
+                        default_size: None, dp(72)
+                        default_size_hint: 1, None
+                        size_hint_y: None
+                        height: self.minimum_height
+                        orientation: 'vertical'
+                        spacing: dp(8)
+                        padding: dp(2), dp(4), dp(2), dp(4)
+
+            ReferenceCategory:
+                id: digits_cat
+                cat_title: root.digits_cat_text
+
+            BoxLayout:
+                id: digits_container
+                orientation: 'vertical'
+                size_hint_y: None
+                height: 0
+                opacity: 0
+                disabled: True
+
+                RecycleView:
+                    id: digits_rv
+                    bar_width: dp(3)
+                    scroll_type: ['bars', 'content']
+                    do_scroll_x: False
+                    viewclass: 'ReferenceRow'
+
+                    RecycleBoxLayout:
+                        default_size: None, dp(72)
+                        default_size_hint: 1, None
+                        size_hint_y: None
+                        height: self.minimum_height
+                        orientation: 'vertical'
+                        spacing: dp(8)
+                        padding: dp(2), dp(4), dp(2), dp(4)
+
+
+            Widget:
+                size_hint_y: 1
 <TranslatorScreen>:
     BoxLayout:
         orientation: 'vertical'
@@ -5339,16 +5430,55 @@ class ReferenceRow(BoxLayout):
     is_header = BooleanProperty(False)
 
 
+class ReferenceCategory(BoxLayout):
+    cat_title = StringProperty('')
+    cat_arrow = StringProperty('▼')
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._screen = None
+        self._which = None
+
+    def setup(self, screen, which):
+        self._screen = screen
+        self._which = which
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            if self._screen is not None:
+                self._screen.toggle_category(self._which)
+            return True
+        return super().on_touch_down(touch)
+
+
+Factory.register('ReferenceCategory', cls=ReferenceCategory)
+
+
 class ReferenceScreen(BaseScreen):
     reference_title = StringProperty()
+    letters_cat_text = StringProperty()
+    digits_cat_text = StringProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._built_key = None
+        self._letters_data = []
+        self._digits_data = []
+        self._open = set()
 
     def on_pre_enter(self, *args):
         self.app = App.get_running_app()
         self.update_lang()
+        self.ids.letters_cat.setup(self, 'letters')
+        self.ids.digits_cat.setup(self, 'digits')
+        self._open.clear()
+        for which in ('letters', 'digits'):
+            cont = self.ids[which + '_container']
+            Animation.cancel_all(cont, 'height', 'opacity')
+            cont.height = 0
+            cont.opacity = 0
+            cont.disabled = True
+            self.ids[which + '_cat'].cat_arrow = '▼'
 
         key = self.app.current_language
         if self._built_key != key:
@@ -5360,6 +5490,8 @@ class ReferenceScreen(BaseScreen):
     def update_lang(self):
         super().update_lang()
         self.reference_title = self.get_translation('reference_title')
+        self.letters_cat_text = self.get_translation('section_letters')
+        self.digits_cat_text = self.get_translation('section_digits')
 
     def _build_rv_data(self):
         lang = self.app.current_language
@@ -5369,54 +5501,74 @@ class ReferenceScreen(BaseScreen):
 
         stats_fmt = self.get_translation('stats_label')
 
-        data = []
-
-        data.append({
-            "is_header": True,
-            "symbol": self.get_translation('section_letters'),
-            "braille": "",
-            "stats": "",
-        })
-
         letters_stats = self.app.stats.get(lang, {})
         digits_stats = self.app.stats.get('digits', {})
 
+        letters_rows = []
         for ch, dots in letters_items:
-            braille_char = self.get_braille_char(dots)
-
             st = letters_stats.get(ch, {"correct": 0, "wrong": 0})
-            stats_text = stats_fmt.format(st["correct"], st["wrong"])
-
-            data.append({
+            letters_rows.append({
                 "viewclass": "ReferenceRow",
                 "symbol": ch,
-                "stats": stats_text,
-                "braille": braille_char,
+                "stats": stats_fmt.format(st["correct"], st["wrong"]),
+                "braille": self.get_braille_char(dots),
                 "is_header": False,
             })
 
-        data.append({
-            "is_header": True,
-            "symbol": self.get_translation('section_digits'),
-            "braille": "",
-            "stats": "",
-        })
-
+        digits_rows = []
         for d, dots in digits_items:
-            braille_char = ns + self.get_braille_char(dots)
-
             st = digits_stats.get(d, {"correct": 0, "wrong": 0})
-            stats_text = stats_fmt.format(st["correct"], st["wrong"])
-
-            data.append({
+            digits_rows.append({
                 "viewclass": "ReferenceRow",
                 "symbol": d,
-                "stats": stats_text,
-                "braille": braille_char,
+                "stats": stats_fmt.format(st["correct"], st["wrong"]),
+                "braille": ns + self.get_braille_char(dots),
                 "is_header": False,
             })
 
-        self.ids.rv.data = data
+        self._letters_data = letters_rows
+        self._digits_data = digits_rows
+        self.ids.letters_rv.data = letters_rows
+        self.ids.digits_rv.data = digits_rows
+
+    def _fit_targets(self):
+        n_open = len(self._open)
+        if n_open == 0:
+            return {}
+        box = self.ids.cats_box
+        fixed = dp(60) * 2 + dp(12) * 4 + dp(4)
+        avail = max(0, box.height - fixed)
+        per = avail / n_open
+        targets = {}
+        for which in self._open:
+            data = self._letters_data if which == 'letters' else self._digits_data
+            if not data:
+                continue
+            max_rows = len(data)
+            rows = max(1, min(max_rows, int((per - dp(8)) // (dp(72) + dp(8)))))
+            targets[which] = rows * dp(72) + (rows - 1) * dp(8) + dp(8)
+        return targets
+
+    def _apply_targets(self, targets):
+        for which in ('letters', 'digits'):
+            cont = self.ids[which + '_container']
+            is_open = which in self._open
+            target = targets.get(which, 0)
+            Animation.cancel_all(cont, 'height', 'opacity')
+            anim = Animation(height=target, duration=0.25, t='out_quad')
+            anim &= Animation(opacity=1 if is_open else 0, duration=0.18)
+            anim.start(cont)
+            cont.disabled = not is_open
+
+    def toggle_category(self, which):
+        container = self.ids[which + '_container']
+        opening = container.height <= 1
+        if opening:
+            self._open.add(which)
+        else:
+            self._open.discard(which)
+        self.ids[which + '_cat'].cat_arrow = '▲' if opening else '▼'
+        self._apply_targets(self._fit_targets())
 
     def _refresh_stats_in_rv(self):
         lang = self.app.current_language
@@ -5425,16 +5577,17 @@ class ReferenceScreen(BaseScreen):
         letters_stats = self.app.stats.get(lang, {})
         digits_stats = self.app.stats.get('digits', {})
 
-        data = self.ids.rv.data
-        for row in data:
-            if row.get("is_header"):
-                continue
+        for row in self._letters_data:
             key = row.get("symbol")
-            bucket = digits_stats if key in digits_data else letters_stats
-            st = bucket.get(key, {"correct": 0, "wrong": 0})
+            st = letters_stats.get(key, {"correct": 0, "wrong": 0})
+            row["stats"] = fmt.format(st["correct"], st["wrong"])
+        for row in self._digits_data:
+            key = row.get("symbol")
+            st = digits_stats.get(key, {"correct": 0, "wrong": 0})
             row["stats"] = fmt.format(st["correct"], st["wrong"])
 
-        self.ids.rv.refresh_from_data()
+        self.ids.letters_rv.refresh_from_data()
+        self.ids.digits_rv.refresh_from_data()
 
 
 class TranslatorScreen(BaseScreen):
