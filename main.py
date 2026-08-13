@@ -2509,7 +2509,7 @@ translations, LANGUAGES = load_translations()
 
 
 _bubble_translations = {
-    'Copy': ('copy', 'copy_popup'),
+    'Copy': ('copy',),
     'Cut': ('cut_popup',),
     'Paste': ('paste_popup',),
     'Select All': ('select_all_popup',),
@@ -5701,6 +5701,18 @@ class TranslatorScreen(BaseScreen):
             on_touch_down=self._on_delete_hold_down,
             on_touch_up=self._on_delete_hold_up,
         )
+        self.ids.braille_input_panel.pos_hint = {'center_x': 2}
+        ti = self.ids.input_text
+        orig_insert = ti.insert_text
+
+        def _clean_insert(substring, from_undo=False):
+            if substring and substring[0] in '\r\n':
+                prefix = ti.text[:ti.cursor_index()]
+                if prefix.strip('\r\n') == '':
+                    substring = substring.lstrip('\r\n')
+            return orig_insert(substring, from_undo=from_undo)
+
+        ti.insert_text = _clean_insert
 
     def on_pre_enter(self, *args):
         super().on_pre_enter(*args)
@@ -5852,12 +5864,14 @@ class TranslatorScreen(BaseScreen):
         self.braille_input_active = not self.braille_input_active
         panel = self.ids.braille_input_panel
         if self.braille_input_active:
+            panel.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
             panel.opacity = 1
             panel.disabled = False
             self.clear_braille_input()
             self.input_number_mode = False
             self.ids.input_text.focus = False
         else:
+            panel.pos_hint = {'center_x': 2}
             panel.opacity = 0
             panel.disabled = True
 
@@ -5867,6 +5881,7 @@ class TranslatorScreen(BaseScreen):
         if self.ids:
             panel = self.ids.get('braille_input_panel')
             if panel:
+                panel.pos_hint = {'center_x': 2}
                 panel.opacity = 0
                 panel.disabled = True
 
