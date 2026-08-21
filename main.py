@@ -5545,7 +5545,7 @@ class ReferenceScreen(BaseScreen):
         self._built_key = None
         self._letters_data = []
         self._digits_data = []
-        self._open = set()
+        self._open = []
 
     def on_pre_enter(self, *args):
         self.app = App.get_running_app()
@@ -5613,21 +5613,51 @@ class ReferenceScreen(BaseScreen):
         self.ids.digits_rv.data = digits_rows
 
     def _fit_targets(self):
-        n_open = len(self._open)
-        if n_open == 0:
+        n = len(self._open)
+        if n == 0:
             return {}
         box = self.ids.cats_box
-        fixed = dp(60) * 2 + dp(12) * 4 + dp(4)
+        row_h = dp(72)
+        gap = dp(8)
+        n_children = 2 + n + 1
+        fixed = dp(60) * 2 + dp(12) * (n_children - 1) + dp(4)
         avail = max(0, box.height - fixed)
-        per = avail / n_open
-        targets = {}
+        max_rows = max(1, avail // (row_h + gap))
+
+        lengths = {}
         for which in self._open:
             data = self._letters_data if which == 'letters' else self._digits_data
-            if not data:
-                continue
-            max_rows = len(data)
-            rows = max(1, min(max_rows, int((per - dp(8)) // (dp(72) + dp(8)))))
-            targets[which] = rows * dp(72) + (rows - 1) * dp(8) + dp(8)
+            lengths[which] = len(data)
+
+        rows = {}
+        if n == 1:
+            rows[self._open[0]] = max_rows
+        else:
+            base = max_rows // n
+            rem = max_rows % n
+            others = base
+            last = base + rem
+            if rem == 0 and others > 1:
+                take = min(others - 1, n - 1)
+                others -= take
+                last += take
+            last_w = self._open[-1]
+            for which in self._open:
+                rows[which] = last if which == last_w else others
+        for which in self._open:
+            rows[which] = max(1, min(rows[which], lengths[which]))
+        surplus = max_rows - sum(rows.values())
+        i = 0
+        while surplus > 0 and i < n * 2:
+            which = self._open[-(i % n) - 1]
+            if rows[which] < lengths[which]:
+                rows[which] += 1
+                surplus -= 1
+            i += 1
+        targets = {}
+        for which in self._open:
+            r = rows[which]
+            targets[which] = r * row_h + (r - 1) * gap + gap
         return targets
 
     def _apply_targets(self, targets):
@@ -5645,9 +5675,11 @@ class ReferenceScreen(BaseScreen):
         container = self.ids[which + '_container']
         opening = container.height <= 1
         if opening:
-            self._open.add(which)
+            if which not in self._open:
+                self._open.append(which)
         else:
-            self._open.discard(which)
+            if which in self._open:
+                self._open.remove(which)
         self.ids[which + '_cat'].cat_arrow = '▲' if opening else '▼'
         self._apply_targets(self._fit_targets())
 
