@@ -2347,7 +2347,7 @@ Builder.load_string('''
 <BubbleContent>:
     background_image: ''
     background_color: (0, 0, 0, 0)
-    padding: [dp(4), dp(4)]
+    padding: [dp(8), dp(8)]
     spacing: dp(1)
     canvas:
         Color:
@@ -2381,7 +2381,7 @@ Builder.load_string('''
     canvas.before:
         Clear
         Color:
-            rgba: (app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.16) if self.state == 'down' else app.card_color
+            rgba: (app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.16) if self.state == 'down' else (0, 0, 0, 0)
         Rectangle:
             pos: self.pos
             size: self.size
@@ -6422,11 +6422,6 @@ class BrailleApp(App):
             scr.new_question()
 
     def stats_key_for(self, char):
-        """Which stats bucket a symbol belongs to.
-
-        Digits (and later other symbol categories) keep their own bucket
-        (like a separate language) instead of per-language digit stats.
-        """
         if char in digits_data:
             return 'digits'
         return self.current_language
@@ -6482,16 +6477,22 @@ class BrailleApp(App):
 
     def build_lessons(self, items, group_size):
         lessons, learned = [], []
-        for i in range(0, len(items), group_size):
-            chunk = items[i:i + group_size]
+        chunks = [items[i:i + group_size] for i in range(0, len(items), group_size)]
 
+        if len(chunks) > 1 and len(chunks[-1]) <= 2:
+            tail = chunks[-2] + chunks[-1]
+            split_at = (len(tail) + 1) // 2
+            chunks[-2] = tail[:split_at]
+            chunks[-1] = tail[split_at:]
+
+        for group_index, chunk in enumerate(chunks):
             lessons.append({"mode": "study", "letters": chunk})
 
             lessons.append({"mode": "practice", "letters": chunk})
 
             learned += chunk
 
-            if i > 0:
+            if group_index > 0:
                 lessons.append({"mode": "review", "letters": learned[:]})
 
         lessons.append({"mode": "exam", "letters": items})
