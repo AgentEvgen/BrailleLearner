@@ -97,7 +97,24 @@ Builder.load_string('''
             texture: app.btn_gradient
 
 <RedButton@Button>:
-    color: 0.86, 0.15, 0.15, 1 if app.theme_tick >= 0 else 1
+    bold: True
+    color: ((1, 0.62, 0.64, 1) if app.dark_mode else (0.72, 0.06, 0.11, 1)) if app.theme_tick >= 0 else (0.72, 0.06, 0.11, 1)
+    disabled_color: ((0.64, 0.40, 0.42, 1) if app.dark_mode else (0.68, 0.42, 0.44, 1)) if app.theme_tick >= 0 else (0.68, 0.42, 0.44, 1)
+    background_color: (((0.27, 0.07, 0.095, 1) if self.state == 'down' else (0.19, 0.05, 0.075, 1)) if app.dark_mode else ((0.99, 0.88, 0.89, 1) if self.state == 'down' else (1, 0.945, 0.95, 1))) if app.theme_tick >= 0 else (1, 0.945, 0.95, 1)
+    canvas.before:
+        Clear
+        Color:
+            rgba: (0.58, 0.16, 0.22, 1) if app.dark_mode else (0.96, 0.70, 0.73, 1)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(14)]
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.x + dp(1), self.y + dp(1)
+            size: self.width - dp(2), self.height - dp(2)
+            radius: [dp(13)]
 
 <-DotButton@Button>:
     size_hint: None, None
@@ -2980,10 +2997,6 @@ class LessonRow(BoxLayout):
 
 
 class CoursesScreen(BaseScreen):
-    """List of available courses: one per language (letters) + a common
-    digits course. Picking a course opens its lessons WITHOUT changing the
-    interface language."""
-
     courses_title = StringProperty()
 
     def update_lang(self):
