@@ -2749,7 +2749,6 @@ class BaseScreen(Screen):
                 'correct': 0, 'wrong': 0, 'last_seen': 0,
                 'interval': 0, 'ef': 2.5, 'reps': 0
             }
-            self.app.save_stats()
 
         stat = stats_lang[char]
 
@@ -3768,6 +3767,7 @@ class PracticeScreen(BaseScreen):
         self.current_streak = 0
         self.correct_button = None
         self._answer_buttons = []
+        self._current_answers = []
         self._last_layout_key = None
         self._grid_bound = False
         super().__init__(**kwargs)
@@ -3793,20 +3793,18 @@ class PracticeScreen(BaseScreen):
             self.update_streak_text(score_key="practice")
             self.schedule_once(lambda dt: self.reset_interface(reset_streak=False), 1.2)
 
-    def _update_grid(self, *args):
-        grid = self.ids.answers_grid
-        self._ensure_answer_buttons()
-
-        pool = []
-        if self.app.easy_mode_letters:
-            pool.extend(braille_data[self.app.current_language].keys())
-        if self.app.easy_mode_digits:
-            pool.extend(digits_data.keys())
-        if not pool:
-            pool = list(braille_data[self.app.current_language].keys())
-
+    def _build_current_answers(self, pool=None):
         if not self.current_symbol:
-            return
+            return []
+
+        if pool is None:
+            pool = []
+            if self.app.easy_mode_letters:
+                pool.extend(braille_data[self.app.current_language].keys())
+            if self.app.easy_mode_digits:
+                pool.extend(digits_data.keys())
+            if not pool:
+                pool = list(braille_data[self.app.current_language].keys())
 
         if self.current_symbol in digits_data:
             pool = [s for s in pool if s in digits_data]
@@ -3815,8 +3813,18 @@ class PracticeScreen(BaseScreen):
 
         k = int(self.app.current_difficulty)
         k = max(2, min(k, len(pool)))
+        return self.build_answers_hamming(self.current_symbol, pool, k)
 
-        answers = self.build_answers_hamming(self.current_symbol, pool, k)
+    def _update_grid(self, *args):
+        grid = self.ids.answers_grid
+        self._ensure_answer_buttons()
+
+        if not self.current_symbol:
+            return
+
+        if not self._current_answers:
+            self._current_answers = self._build_current_answers()
+        answers = self._current_answers
 
         horizontal_padding = dp(20)
         spacing = dp(5)
@@ -3959,6 +3967,7 @@ class PracticeScreen(BaseScreen):
             else:
                 self.braille_char = self.get_braille_char(self.current_dots)
 
+        self._current_answers = self._build_current_answers(pool)
         self._update_grid()
 
         if self.quick_review_mode:
@@ -4044,6 +4053,8 @@ class EasyWordsPracticeScreen(BaseScreen):
         self.correct_button = None
         self.current_word = ""
         self._answer_buttons = []
+        self._current_answers = []
+        self._word_pool_cache = {}
         self._last_layout_key = None
         self._grid_bound = False
         super().__init__(**kwargs)
@@ -4084,9 +4095,13 @@ class EasyWordsPracticeScreen(BaseScreen):
 
     def _get_word_pool(self):
         lang = self.app.current_language
-        wl = self.app.word_lists.get(lang) or []
-        allowed_letters = set(self.app.braille_data[lang].keys())
+        wl = self.app.word_lists.get(lang) or ()
+        cache_key = (lang, id(wl))
+        cached = self._word_pool_cache.get(cache_key)
+        if cached is not None:
+            return cached
 
+        allowed_letters = set(self.app.braille_data[lang].keys())
         valid = []
         for w in wl:
             up = w.strip().upper()
@@ -4100,6 +4115,7 @@ class EasyWordsPracticeScreen(BaseScreen):
                 generated.add("".join(random.choice(letters) for _ in range(random.randint(3, 5))))
             valid = list(generated)
 
+        self._word_pool_cache[cache_key] = valid
         return valid
 
     def _word_to_braille(self, word: str) -> str:
@@ -4131,14 +4147,20 @@ class EasyWordsPracticeScreen(BaseScreen):
 
         return ''.join(out)
 
-    def _build_answers(self):
-        pool = self._get_word_pool()
+    def _build_answers(self, pool=None):
+        if pool is None:
+            pool = self._get_word_pool()
         answers = [self.current_word]
 
-        distractors = [w for w in pool if w != self.current_word]
-
-        similar = [w for w in distractors if abs(len(w) - len(self.current_word)) <= 1]
-        other = [w for w in distractors if w not in similar]
+        similar = []
+        other = []
+        for word in pool:
+            if word == self.current_word:
+                continue
+            if abs(len(word) - len(self.current_word)) <= 1:
+                similar.append(word)
+            else:
+                other.append(word)
 
         random.shuffle(similar)
         random.shuffle(other)
@@ -4160,6 +4182,7 @@ class EasyWordsPracticeScreen(BaseScreen):
 
     def new_question(self):
         self.stop_timer()
+        self._current_answers = []
 
         pool = self._get_word_pool()
         if not pool:
@@ -4176,6 +4199,7 @@ class EasyWordsPracticeScreen(BaseScreen):
             self.prompt_text = self._word_to_braille(self.current_word)
             self.prompt_is_braille = True
 
+        self._current_answers = self._build_answers(pool)
         self._update_grid()
 
         if self.quick_review_mode:
@@ -4185,7 +4209,9 @@ class EasyWordsPracticeScreen(BaseScreen):
         if not self.current_word:
             return
 
-        answers = self._build_answers()
+        if not self._current_answers:
+            self._current_answers = self._build_answers()
+        answers = self._current_answers
         grid = self.ids.answers_grid
 
         grid.cols = 1
@@ -4236,9 +4262,10 @@ class EasyWordsPracticeScreen(BaseScreen):
             btn.disabled = not enabled
 
     def _apply_word_stats(self, is_correct: bool):
-        for ch in self.current_word:
-            if ch != ' ':
-                self.app.update_char_stat(ch, is_correct)
+        self.app.update_char_stats(
+            (ch for ch in self.current_word if ch != ' '),
+            is_correct,
+        )
 
     def handle_timeout(self):
         self.stop_timer()
@@ -4629,10 +4656,6 @@ class HardPracticeScreen(BaseScreen):
     def new_question(self):
         self.reset_ui_state()
         self.load_braille_data()
-
-        current_time = time.time()
-        items = list(self.braille_data.keys())
-        weights = [self.calculate_weight(ch, current_time) for ch in items]
 
         if self.quick_review_mode:
             length = random.choice([3, 4])
@@ -6437,9 +6460,21 @@ class BrailleApp(App):
         return self.current_language
 
     def update_char_stat(self, char, is_correct):
+        self.update_char_stats((char,), is_correct)
+
+    def update_char_stats(self, chars, is_correct):
         if not self.use_stats:
             return
 
+        updated = False
+        for char in chars:
+            self._update_char_stat(char, is_correct)
+            updated = True
+
+        if updated:
+            self.save_stats()
+
+    def _update_char_stat(self, char, is_correct):
         key = self.stats_key_for(char)
         self.stats.setdefault(key, {})
 
@@ -6482,8 +6517,6 @@ class BrailleApp(App):
             stat['correct'] += 1
         else:
             stat['wrong'] += 1
-
-        self.save_stats()
 
     def build_lessons(self, items, group_size):
         lessons, learned = [], []
