@@ -1495,7 +1495,6 @@ Builder.load_string('''
                             values: root.language_values
                             size_hint_x: 1
                             on_text: root.update_settings('language', self.text)
-
                     BoxLayout:
                         size_hint_y: None
                         height: dp(52)
@@ -3067,8 +3066,6 @@ class LessonsScreen(BaseScreen):
         self.lessons_title = f"{base} · {subtitle}"
 
     def open_course(self, lang, mode='letters'):
-        """Open a course without touching the interface language:
-        lang = 'digits' selects the common digits course."""
         self.lesson_lang = lang
         self.current_mode = mode
         self.update_lang()
@@ -6171,12 +6168,12 @@ class SettingsScreen(BaseScreen):
         self.toggle_mode_flag("memo_mode_digits", v, "memo_mode_letters", "memo_letters_sw")
 
     def reset_stats(self):
-        lang = self.app.current_language
-
         def do_reset():
-            self.app.stats[lang] = {}
-            self.app.stats['digits'] = {}
-            self.app.save_stats()
+            self.app.stats = {
+                **{lang: {} for lang in self.app.get_available_languages()},
+                'digits': {},
+            }
+            self.app.save_stats(force=True)
 
         self.show_popup(
             title=self.get_translation("reset_stats_title"),
@@ -6734,8 +6731,8 @@ class BrailleApp(App):
 
         self.stats = data
 
-    def save_stats(self):
-        if not self.use_stats:
+    def save_stats(self, force=False):
+        if not self.use_stats and not force:
             return
         self._atomic_json_dump("stats.json", self.stats)
 
