@@ -56,6 +56,7 @@ Builder.load_string('''
     border: 0, 0, 0, 0
     background_color: app.card_color
     color: app.text_color
+    disabled_color: self.color
     font_size: dp(17)
     canvas.before:
         Color:
@@ -1117,6 +1118,7 @@ Builder.load_string('''
                 id: hint_btn
                 text: root.hint_btn
                 font_name: 'BrailleFont'
+                disabled_color: self.color[0], self.color[1], self.color[2], 0.35
                 size_hint: 0.5, None
                 height: dp(56)
                 on_press: root.show_hint()
@@ -2899,7 +2901,6 @@ class BaseScreen(Screen):
 
     def exit_to_practice_levels(self):
         self.app.stop_quick_review()
-        self.quick_review_mode = False
         self.app.switch_screen("practice_levels")
 
     def schedule_once(self, callback, delay):
@@ -3746,6 +3747,8 @@ class PracticeLevelsScreen(BaseScreen):
         self.app.switch_screen('medium_practice')
 
     def start_hard_level(self):
+        scr = self.app.get_screen('hard_practice')
+        scr.quick_review_mode = False
         self.app.switch_screen('hard_practice')
 
     def start_quick_review(self):
@@ -6437,6 +6440,21 @@ class BrailleApp(App):
 
     def stop_quick_review(self):
         self.quick_active = False
+        if not self.root:
+            return
+
+        for screen_name in (
+                'practice',
+                'easy_words_practice',
+                'medium_practice',
+                'hard_practice',
+        ):
+            if not self.root.has_screen(screen_name):
+                continue
+            screen = self.root.get_screen(screen_name)
+            screen.quick_review_mode = False
+            screen.stop_timer()
+            screen.cancel_all_events()
 
     def next_quick_step(self):
         if not self.quick_active or not self.root:
