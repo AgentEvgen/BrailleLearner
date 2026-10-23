@@ -2433,7 +2433,8 @@ digits_data = {
 
 def load_translations():
     translations_dir = resource_find("assets/translations") or os.path.join(
-        os.path.dirname(__file__), "assets", "translations")
+        os.path.dirname(__file__), "assets", "translations"
+    )
 
     loaded_translations = {}
     loaded_languages = {}
@@ -2472,7 +2473,8 @@ def load_translations():
 
 def load_braille_data():
     braille_dir = resource_find("assets/braille") or os.path.join(
-        os.path.dirname(__file__), "assets", "braille")
+        os.path.dirname(__file__), "assets", "braille"
+    )
 
     loaded = {}
 
@@ -3664,7 +3666,7 @@ class LessonTestScreen(BaseScreen):
             instance.background_color = (0.02, 0.59, 0.41, 1)
             instance.color = (1, 1, 1, 1)
             self.correct += 1
-            self.app.update_char_stat(correct_char, True)
+            self.app.update_char_stat(correct_char, True, lang=self.lesson_lang)
             self.animate_correct(instance)
         else:
             instance.background_color = (0.86, 0.15, 0.15, 1)
@@ -3673,7 +3675,7 @@ class LessonTestScreen(BaseScreen):
             if self.correct_button:
                 self.correct_button.background_color = (0.02, 0.59, 0.41, 1)
                 self.correct_button.color = (1, 1, 1, 1)
-            self.app.update_char_stat(correct_char, False)
+            self.app.update_char_stat(correct_char, False, lang=self.lesson_lang)
 
         self.schedule_once(self.next_question, 0.8)
 
@@ -6466,28 +6468,28 @@ class BrailleApp(App):
             self.switch_screen('hard_practice')
             scr.new_question()
 
-    def stats_key_for(self, char):
+    def stats_key_for(self, char, lang=None):
         if char in digits_data:
             return 'digits'
-        return self.current_language
+        return lang if lang is not None else self.current_language
 
-    def update_char_stat(self, char, is_correct):
-        self.update_char_stats((char,), is_correct)
+    def update_char_stat(self, char, is_correct, lang=None):
+        self.update_char_stats((char,), is_correct, lang=lang)
 
-    def update_char_stats(self, chars, is_correct):
+    def update_char_stats(self, chars, is_correct, lang=None):
         if not self.use_stats:
             return
 
         updated = False
         for char in chars:
-            self._update_char_stat(char, is_correct)
+            self._update_char_stat(char, is_correct, lang=lang)
             updated = True
 
         if updated:
             self.save_stats()
 
-    def _update_char_stat(self, char, is_correct):
-        key = self.stats_key_for(char)
+    def _update_char_stat(self, char, is_correct, lang=None):
+        key = self.stats_key_for(char, lang=lang)
         self.stats.setdefault(key, {})
 
         stat = self.stats[key].setdefault(char, {
