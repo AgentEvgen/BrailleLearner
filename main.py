@@ -56,7 +56,6 @@ Builder.load_string('''
     border: 0, 0, 0, 0
     background_color: app.card_color
     color: app.text_color
-    disabled_color: self.color
     font_size: dp(17)
     canvas.before:
         Color:
@@ -2434,8 +2433,7 @@ digits_data = {
 
 def load_translations():
     translations_dir = resource_find("assets/translations") or os.path.join(
-        os.path.dirname(__file__), "assets", "translations"
-    )
+        os.path.dirname(__file__), "assets", "translations")
 
     loaded_translations = {}
     loaded_languages = {}
@@ -2474,8 +2472,7 @@ def load_translations():
 
 def load_braille_data():
     braille_dir = resource_find("assets/braille") or os.path.join(
-        os.path.dirname(__file__), "assets", "braille"
-    )
+        os.path.dirname(__file__), "assets", "braille")
 
     loaded = {}
 
@@ -4358,7 +4355,7 @@ class MediumPracticeScreen(BaseScreen):
         self.current_streak = 0
         self.hint_used = False
         self.current_letter = ''
-        self._pulse_anims = {}
+        self._hint_popup = None
 
     def _enable_controls(self):
         if self.dot_buttons:
@@ -4394,6 +4391,7 @@ class MediumPracticeScreen(BaseScreen):
         return visual_index
 
     def handle_timeout(self):
+        self._dismiss_hint_popup()
         self.stop_timer()
 
         if self.quick_review_mode and self.user_input != [0] * 6:
@@ -4437,7 +4435,7 @@ class MediumPracticeScreen(BaseScreen):
                 btn.background_color = self.app.card_color
 
     def new_question(self):
-        self._stop_all_pulses()
+        self._dismiss_hint_popup()
         self._enable_controls()
         self.user_input = [0] * 6
         self.hint_used = False
@@ -4475,24 +4473,34 @@ class MediumPracticeScreen(BaseScreen):
             self.start_timer()
 
     def on_dot_press(self, visual_index, instance):
-        if visual_index in self._pulse_anims:
-            Animation.cancel_all(instance, "background_color")
-            del self._pulse_anims[visual_index]
-
         logical_index = self.get_logical_index(visual_index)
         self.user_input[logical_index] = 1 - self.user_input[logical_index]
 
         instance.background_color = self.app.accent_color if self.user_input[logical_index] else self.app.card_color
 
-    def _stop_all_pulses(self):
-        for idx, btn in enumerate(self.dot_buttons):
-            Animation.cancel_all(btn, "background_color")
-            logical_idx = self.get_logical_index(idx)
-            if self.user_input[logical_idx]:
-                btn.background_color = self.app.accent_color
-            else:
-                btn.background_color = self.app.card_color
-        self._pulse_anims.clear()
+    def _bind_hint_popup_touch(self, *_):
+        if self._hint_popup is None:
+            return
+        Window.unbind(on_touch_down=self._on_hint_popup_touch)
+        Window.bind(on_touch_down=self._on_hint_popup_touch)
+
+    def _on_hint_popup_touch(self, *_):
+        self._dismiss_hint_popup()
+        return False
+
+    def _clear_hint_popup(self, popup, *_):
+        if self._hint_popup is popup:
+            Window.unbind(on_touch_down=self._on_hint_popup_touch)
+            self._hint_popup = None
+
+    def _dismiss_hint_popup(self):
+        popup = self._hint_popup
+        if popup is None:
+            Window.unbind(on_touch_down=self._on_hint_popup_touch)
+            return
+        Window.unbind(on_touch_down=self._on_hint_popup_touch)
+        self._hint_popup = None
+        popup.dismiss()
 
     def show_hint(self):
         if self.hint_used or not self.current_letter:
@@ -4501,32 +4509,35 @@ class MediumPracticeScreen(BaseScreen):
         self.hint_used = True
         self.ids.hint_btn.disabled = True
 
-        for visual_index, btn in enumerate(self.dot_buttons):
-            logical_index = self.get_logical_index(visual_index)
+        braille_symbol = self.get_braille_char(self.current_dots)
+        if self.current_letter in digits_data:
+            braille_symbol = self.get_braille_char(number_sign_dots) + braille_symbol
 
-            is_target = self.current_dots[logical_index] == 1
-            is_pressed = self.user_input[logical_index] == 1
+        popup_width = min(dp(420), max(1, Window.width) * 0.82)
+        popup_height = min(dp(300), max(1, Window.height) * 0.58)
+        symbol_font_size = min(dp(170), popup_width * 0.40, popup_height * 0.58)
+        popup_padding = min(dp(20), popup_width * 0.045, popup_height * 0.06)
+        popup_spacing = min(dp(8), popup_height * 0.03)
 
-            if is_target and not is_pressed:
-                btn.background_color = (0.78, 0.824, 0.996, 1)
-
-                anim = (
-                        Animation(background_color=(0.647, 0.706, 0.988, 1), duration=0.55) +
-                        Animation(background_color=(0.78, 0.824, 0.996, 1), duration=0.55)
-                )
-                anim.repeat = True
-                anim.start(btn)
-                self._pulse_anims[visual_index] = anim
-
-            elif not is_target and is_pressed:
-                btn.background_color = (0.99, 0.69, 0.69, 1)
+        popup = self.show_popup(
+            title=self.hint_btn,
+            text=braille_symbol,
+            size=(popup_width, popup_height),
+            auto_dismiss=False,
+            font_size=symbol_font_size,
+            font_name='BrailleFont',
+            padding=popup_padding,
+            spacing=popup_spacing,
+        )
+        self._hint_popup = popup
+        popup.bind(on_dismiss=self._clear_hint_popup)
+        Clock.schedule_once(self._bind_hint_popup_touch, 0)
 
     def confirm_answer(self):
         if not self.current_letter:
             return
 
-        self._stop_all_pulses()
-
+        self._dismiss_hint_popup()
         self.stop_timer()
 
         is_correct = (self.user_input == self.current_dots)
@@ -4561,7 +4572,7 @@ class MediumPracticeScreen(BaseScreen):
             self.schedule_once(lambda dt: self.new_question(), 2)
 
     def on_leave(self, *args):
-        self._stop_all_pulses()
+        self._dismiss_hint_popup()
         super().on_leave(*args)
 
 
@@ -6218,12 +6229,13 @@ class SettingsScreen(BaseScreen):
 
     def reset_lessons_progress(self):
         def do_reset():
-            lang = self.app.current_language
-
-            for key in (lang, "digits_common"):
-                if key in self.app.lessons_progress:
-                    self.app.lessons_progress[key] = {"completed_count": 0, "progress": {}}
-
+            self.app.lessons_progress = {
+                **{
+                    lang: {"completed_count": 0, "progress": {}}
+                    for lang in self.app.get_available_languages()
+                },
+                "digits_common": {"completed_count": 0, "progress": {}},
+            }
             self.app.save_lessons_progress()
 
             if "lessons" in self.app._loaded_screens:
