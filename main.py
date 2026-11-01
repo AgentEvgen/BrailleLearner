@@ -718,7 +718,7 @@ Builder.load_string('''
 
                     Label:
                         id: study_symbol
-                        text: root.current_symbol
+                        text: root.format_symbol(root.current_symbol)
                         font_name: 'BrailleFont'
                         font_size: min(dp(84), self.height * 0.55) if self.height > 0 else dp(40)
                         color: app.accent_color
@@ -838,7 +838,8 @@ Builder.load_string('''
                     radius: [dp(23)]
 
             Label:
-                text: root.prompt_text
+                id: lesson_test_prompt
+                text: root.format_symbol(root.prompt_text)
                 font_name: 'BrailleFont'
                 font_size: min(dp(80), self.height * 0.55) if self.height > 0 else dp(40)
                 color: app.accent_color
@@ -1026,7 +1027,8 @@ Builder.load_string('''
                 quick_review_mode: root.quick_review_mode
 
         Label:
-            text: root.current_letter
+            id: medium_symbol
+            text: root.format_symbol(root.current_letter)
             font_name: 'BrailleFont'
             font_size: min(dp(84), self.height * 0.6) if self.height > 0 else dp(44)
             color: app.accent_color
@@ -2681,6 +2683,11 @@ class BaseScreen(Screen):
         if dots[5]: code |= 0x20
         return chr(code)
 
+    def format_symbol(self, symbol):
+        if symbol in digits_data:
+            return self.get_braille_char(number_sign_dots) + symbol
+        return symbol
+
     def text_to_braille(self, text):
         out = []
         lang_map = self.app.braille_data.get(self.app.current_language, {})
@@ -3118,7 +3125,8 @@ class LessonsScreen(BaseScreen):
                 mode_title = self.get_translation('Test')
 
             title = f"{self.get_translation('lesson')} {idx + 1}: {mode_title}"
-            letters_text = self.get_translation('letters_label').format(' '.join(lesson['letters']))
+            symbols_text = ' '.join(self.format_symbol(symbol) for symbol in lesson['letters'])
+            letters_text = self.get_translation('letters_label').format(symbols_text)
 
             if stars > 0:
                 if mode == 'study':
@@ -3377,7 +3385,7 @@ class LessonStudyScreen(BaseScreen):
                 braille_char = self.get_braille_char(dots)
 
             ll, bl = self._letters_table_widgets[i]
-            ll.text = char
+            ll.text = self.format_symbol(char)
             bl.text = braille_char
 
         grid.height = grid.minimum_height
@@ -3652,7 +3660,7 @@ class LessonTestScreen(BaseScreen):
                 btn.font_name = 'BrailleFont'
                 btn.font_size = dp(36)
             else:
-                btn.text = a
+                btn.text = self.format_symbol(a)
                 btn.font_name = 'BrailleFont'
 
             btn.bind(on_press=lambda inst, correct_char=char: self.check_answer(inst, correct_char))
