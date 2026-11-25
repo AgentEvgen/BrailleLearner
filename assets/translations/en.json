@@ -82,6 +82,7 @@
     "select_all_popup": "Select All",
     "theme": "Theme",
     "theme_light": "Light theme",
-    "dark_mode": "Dark theme"
+    "dark_mode": "Dark theme",
+    "medium_hint_button_label": "Show hint button"
   }
 }

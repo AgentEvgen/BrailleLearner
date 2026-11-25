@@ -83,6 +83,7 @@
     "select_all_popup": "Выбрать всё",
     "theme": "Тема",
     "theme_light": "Свѣтлая тема",
-    "dark_mode": "Темная тема"
+    "dark_mode": "Темная тема",
+    "medium_hint_button_label": "Показывать кнопку подсказки"
     }
 }

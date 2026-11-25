@@ -1103,14 +1103,14 @@ Builder.load_string('''
         BoxLayout:
             orientation: 'horizontal'
             size_hint_y: 0.13
-            spacing: dp(14)
+            spacing: dp(14) if app.medium_hint_enabled else 0
             padding: [dp(16), 0]
 
             BaseButton:
                 id: confirm_btn
                 text: root.confirm_btn
                 font_name: 'BrailleFont'
-                size_hint: 0.5, None
+                size_hint: (0.5 if app.medium_hint_enabled else 1), None
                 height: dp(56)
                 on_press: root.confirm_answer()
                 background_disabled_normal: self.background_normal
@@ -1121,8 +1121,11 @@ Builder.load_string('''
                 text: root.hint_btn
                 font_name: 'BrailleFont'
                 disabled_color: self.color[0], self.color[1], self.color[2], 0.35
-                size_hint: 0.5, None
+                size_hint: (0.5 if app.medium_hint_enabled else None), None
+                width: dp(0) if not app.medium_hint_enabled else dp(100)
                 height: dp(56)
+                opacity: 1 if app.medium_hint_enabled else 0
+                disabled: root.hint_used or not app.medium_hint_enabled
                 on_press: root.show_hint()
                 background_disabled_normal: self.background_normal
                 background_disabled_down: self.background_down
@@ -1671,6 +1674,24 @@ Builder.load_string('''
                             size_hint_x: None
                             width: dp(60)
                             on_active: root.toggle_medium_digits(self.active)
+
+                    BoxLayout:
+                        size_hint_y: None
+                        height: dp(52)
+                        spacing: dp(10)
+                        Label:
+                            text: root.medium_hint_button_label
+                            font_name: 'BrailleFont'
+                            halign: 'left'
+                            text_size: self.width, None
+                            valign: 'middle'
+                            color: app.text_color
+                        Switch:
+                            id: medium_hint_sw
+                            active: app.medium_hint_enabled
+                            size_hint_x: None
+                            width: dp(60)
+                            on_active: root.toggle_medium_hint(self.active)
 
                 SettingsSection:
                     SettingsHeader:
@@ -4377,7 +4398,7 @@ class MediumPracticeScreen(BaseScreen):
         if 'confirm_btn' in self.ids:
             self.ids.confirm_btn.disabled = False
         if 'hint_btn' in self.ids:
-            self.ids.hint_btn.disabled = False
+            self.ids.hint_btn.disabled = not self.app.medium_hint_enabled
 
     def update_lang(self):
         super().update_lang()
@@ -4516,7 +4537,7 @@ class MediumPracticeScreen(BaseScreen):
         popup.dismiss()
 
     def show_hint(self):
-        if self.hint_used or not self.current_letter:
+        if not self.app.medium_hint_enabled or self.hint_used or not self.current_letter:
             return
 
         self.hint_used = True
@@ -6053,6 +6074,7 @@ class SettingsScreen(BaseScreen):
     quick_review_header = StringProperty()
     medium_mode_header = StringProperty()
     mirror_mode_label = StringProperty()
+    medium_hint_button_label = StringProperty()
     quick_mode_easy_label = StringProperty()
     quick_mode_easy_words_label = StringProperty()
     quick_mode_medium_label = StringProperty()
@@ -6085,6 +6107,7 @@ class SettingsScreen(BaseScreen):
         self.quick_review_header = self.get_translation('quick_review_header')
         self.medium_mode_header = self.get_translation('medium_mode_header')
         self.mirror_mode_label = self.get_translation('mirror_mode_label')
+        self.medium_hint_button_label = self.get_translation('medium_hint_button_label')
         self.include_letters = self.get_translation('include_letters')
         self.include_digits = self.get_translation('include_digits')
         self.memory_game_title = self.get_translation('memory_game_title')
@@ -6157,6 +6180,10 @@ class SettingsScreen(BaseScreen):
 
     def toggle_medium_digits(self, v):
         self.toggle_mode_flag("medium_mode_digits", v, "medium_mode_letters", "medium_letters_sw")
+
+    def toggle_medium_hint(self, v):
+        self.app.medium_hint_enabled = v
+        self.app.save_settings()
 
     def toggle_quick_easy(self, v: bool):
         self.app.quick_mode_easy = v
@@ -6289,6 +6316,7 @@ class BrailleApp(App):
     easy_mode_digits = BooleanProperty(True)
     medium_mode_letters = BooleanProperty(True)
     medium_mode_digits = BooleanProperty(True)
+    medium_hint_enabled = BooleanProperty(True)
     lessons_config = DictProperty({})
     lessons_progress = DictProperty({})
     memo_mode_letters = BooleanProperty(True)
@@ -6736,6 +6764,7 @@ class BrailleApp(App):
             self.easy_mode_digits = data.get('easy_mode_digits', True)
             self.medium_mode_letters = data.get('medium_mode_letters', True)
             self.medium_mode_digits = data.get('medium_mode_digits', True)
+            self.medium_hint_enabled = data.get('medium_hint_enabled', True)
             self.quick_mode_easy = data.get('quick_mode_easy', True)
             self.quick_mode_easy_words = data.get('quick_mode_easy_words', True)
             self.quick_mode_medium = data.get('quick_mode_medium', True)
@@ -6760,6 +6789,7 @@ class BrailleApp(App):
             'easy_mode_digits': self.easy_mode_digits,
             'medium_mode_letters': self.medium_mode_letters,
             'medium_mode_digits': self.medium_mode_digits,
+            'medium_hint_enabled': self.medium_hint_enabled,
             'quick_mode_easy': self.quick_mode_easy,
             'quick_mode_easy_words': self.quick_mode_easy_words,
             'quick_mode_medium': self.quick_mode_medium,
